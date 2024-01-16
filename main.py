@@ -1,10 +1,12 @@
 import os
 from time import sleep
 from datetime import timedelta
+from tkinter import Tk
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from interface import MainWindow
 from tranzy_db_tools import *
 from config import TIME_TO_RUN, POLLING_INTERVAL
 
@@ -49,4 +51,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    root = Tk()
+    root.title("Tranzy Stats")
+    MainWindow(root)
+    root.mainloop()
+    # main()
