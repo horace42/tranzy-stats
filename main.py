@@ -53,6 +53,7 @@ def main():
 if __name__ == '__main__':
     root = Tk()
     root.title("Tranzy Stats")
-    MainWindow(root)
+    w = MainWindow(root)
+    w.agency_name_var.set(get_agency_name(AGENCY_ID))
     root.mainloop()
     # main()

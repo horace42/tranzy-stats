@@ -64,6 +64,21 @@ def set_agency(agency_id: int):
     headers["X-Agency-Id"] = str(agency_id)
 
 
+def get_agency_name(agency_id: str):
+    headers_ag = {k: headers[k] for k in headers if k != "X-Agency-Id"}
+    try:
+        response = requests.get(url=f"{TRANZY_URL}{AGENCY}", headers=headers_ag)
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as err:
+        print(explain_error(str(err)))
+        # raise SystemExit(err)
+        return "Agency name error"
+    else:
+        print(headers_ag)
+        print(response.json())
+        return next((a['agency_name'] for a in response.json() if a["agency_id"] == int(agency_id)), None)
+
+
 def get_route(line_number: str):
     """
     Get route information for specific line number.
