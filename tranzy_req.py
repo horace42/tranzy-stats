@@ -11,7 +11,7 @@ from datetime import datetime
 import requests
 
 from config import AGENCY_ID, TRANZY_KEY, TRANZY_URL, \
-    AGENCY, VEHICLES, ROUTES, TRIPS, SHAPES, STOPS, STOP_TIMES
+    AGENCY, VEHICLES, ROUTES, TRIPS, STOPS, STOP_TIMES
 
 # calls to other endpoints than agency must have "X-Agency-Id" in headers
 headers = {
@@ -74,8 +74,8 @@ def get_agency_name(agency_id: str):
         # raise SystemExit(err)
         return "Agency name error"
     else:
-        print(headers_ag)
-        print(response.json())
+        # print(headers_ag)
+        # print(response.json())
         return next((a['agency_name'] for a in response.json() if a["agency_id"] == int(agency_id)), None)
 
 

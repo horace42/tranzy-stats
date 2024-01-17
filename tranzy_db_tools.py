@@ -160,6 +160,15 @@ def select_monitored_trip(session: Session):
         return None
 
 
+def get_monitored_trip(session: Session):
+    stmt = select(Trip).order_by(Trip.route_short_name)
+    trip_obj_list =session.execute(stmt).scalars().all()
+    if trip_obj_list:
+        return trip_obj_list
+    else:
+        return None
+
+
 def get_monitor_config(session: Session, trip_id) -> (Trip, list[Stop]):
     """
     Get the necessary details for monitoring
