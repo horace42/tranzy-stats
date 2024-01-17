@@ -10,6 +10,7 @@ from config import POLLING_INTERVAL
 
 class MainWindow:
     def __init__(self, r: Tk):
+        self.after_countdown_id = None
         self.root = r
         self.root.minsize(width=1024, height=768)
 
@@ -121,8 +122,8 @@ class MainWindow:
         next_poll_label = ttk.Label(right_frame, text="Next poll in (s):", width=30)
         next_poll_label.grid(column=0, row=11)
 
-        self.timer = StringVar(value="30")
-        timer_label = ttk.Label(right_frame, textvariable=self.timer, width=10)
+        self.timer_var = StringVar(value="--")
+        timer_label = ttk.Label(right_frame, textvariable=self.timer_var, width=10)
         timer_label.grid(column=1, row=11)
 
         for child in right_frame.winfo_children():
@@ -136,7 +137,26 @@ class MainWindow:
             self.start_monitoring_button.state(["!disabled"])
 
     def start_monitoring(self):
+        if self.after_countdown_id:
+            # there's a countdown in progress
+            # TODO: move code in stop monitoring func, add after call for getting vehicles
+            self.timer_var.set("--")
+            self.root.after_cancel(self.after_countdown_id)
+            self.after_countdown_id = None
         self.start_monitoring_button.state(["disabled"])
         trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
         messagebox.showinfo(title="testing", message=f"Trip ID: |{trip_id}|")
+        self.countdown(int(self.polling_interval_var.get()))
+        self.stop_monitoring()
+
+    def stop_monitoring(self):
         self.start_monitoring_button.state(["!disabled"])
+
+    def countdown(self, timer: int):
+        self.timer_var.set(value=str(timer))
+        if timer > 0:
+            self.after_countdown_id = self.root.after(1000, self.countdown, timer - 1)
+        else:
+            messagebox.showinfo(title="testing", message="Time's up!")
+            self.timer_var.set("--")
+            self.after_countdown_id = None
