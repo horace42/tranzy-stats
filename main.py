@@ -23,6 +23,7 @@ def main():
     session = Session(engine)
 
     # populate configured_trips widget with the trips already stored in db
+    # TODO move to interface (to be call also after configuring new trip
     configured_trips_list = get_monitored_trip(session)
     if configured_trips_list:
         for t in configured_trips_list:

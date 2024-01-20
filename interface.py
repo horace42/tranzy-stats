@@ -12,6 +12,7 @@ class MainWindow:
     def __init__(self, r: Tk):
         self.after_countdown_id = None  # id to cancel scheduling of countdown (single polling)
         self.after_stop_polling_id = None  # id to cancel scheduling of stop polling (time to run)
+        self.after_deferred_start_id = None  # id to cancel scheduling of deferred start
         self.time_to_run = 5  # default time to run the polling (minutes)
         self.monitoring = False  # monitoring in progress
         self.trip_id = ""
@@ -41,7 +42,7 @@ class MainWindow:
 
         self.polling_interval_var = StringVar(value=str(POLLING_INTERVAL))
         polling_interval_spin = ttk.Spinbox(left_frame, width=4, from_=10, to=90, increment=10,
-                                            textvariable=self.polling_interval_var)
+                                            textvariable=self.polling_interval_var, wrap=True)
         polling_interval_spin.grid(column=3, row=0)
 
         self.trips_choices = []
@@ -71,7 +72,7 @@ class MainWindow:
 
         self.minutes_var = StringVar(value=TIME_TO_RUN)
         self.minutes_spin = ttk.Spinbox(left_frame, width=5, from_=10, to=90, increment=10,
-                                        textvariable=self.minutes_var)
+                                        textvariable=self.minutes_var, wrap=True)
         self.minutes_spin.grid(column=1, row=8)
 
         self.start_time_label = ttk.Label(left_frame, text="Start time:", width=15, state=DISABLED)
@@ -83,10 +84,9 @@ class MainWindow:
         start_frame = ttk.Frame(left_frame, width=100, height=20)
         start_frame.grid_propagate(False)
         start_frame.grid(column=3, row=8)
-        # TODO: implement check in start_monitoring > default time if end time not valid
-        self.start_hour_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=23, increment=1,
+        self.start_hour_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=23, increment=1, wrap=True,
                                            textvariable=self.start_hour_var, state=DISABLED)
-        self.start_minute_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=50, increment=10,
+        self.start_minute_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=50, increment=10, wrap=True,
                                              textvariable=self.start_minute_var, state=DISABLED)
         self.start_hour_spin.grid(column=0, row=0)
         self.start_minute_spin.grid(column=1, row=0)
@@ -100,9 +100,9 @@ class MainWindow:
         end_frame = ttk.Frame(left_frame, width=100, height=20)
         end_frame.grid_propagate(False)
         end_frame.grid(column=3, row=9)
-        self.end_hour_spin = ttk.Spinbox(end_frame, width=4, from_=0, to=23, increment=1,
+        self.end_hour_spin = ttk.Spinbox(end_frame, width=4, from_=0, to=23, increment=1, wrap=True,
                                          textvariable=self.end_hour_var, state=DISABLED)
-        self.end_minute_spin = ttk.Spinbox(end_frame, width=4, from_=0, to=50, increment=10,
+        self.end_minute_spin = ttk.Spinbox(end_frame, width=4, from_=0, to=50, increment=10, wrap=True,
                                            textvariable=self.end_minute_var, state=DISABLED)
         self.end_hour_spin.grid(column=0, row=0)
         self.end_minute_spin.grid(column=1, row=0)
@@ -163,6 +163,7 @@ class MainWindow:
         # compute time to run based on selected radio button
         if self.interval_type_var.get() == "duration":
             self.time_to_run = int(self.minutes_var.get())
+            self.deferred_start()
         else:
             start_time = datetime.combine(datetime.today(),
                                           time(int(self.start_hour_var.get()), int(self.start_minute_var.get())))
@@ -176,7 +177,16 @@ class MainWindow:
             if start_time < datetime.now():
                 # fall back to default time to run in case end time is before start time
                 self.time_to_run = TIME_TO_RUN
-            # TODO: implement wait until start time
+                wait_for = 0
+                self.write_log("Start time in the past, starting now...")
+                self.deferred_start()
+            else:
+                wait_for = int((start_time - datetime.now()).total_seconds() * 1000)
+                self.write_log(f"Waiting until {start_time.astimezone().strftime('%H:%M:%S')}")
+                self.after_deferred_start_id = self.root.after(wait_for, self.deferred_start)
+
+    def deferred_start(self):
+        self.after_deferred_start_id = None
         self.write_log(f"polling vehicles for trip {self.trip_id} for {self.time_to_run} minutes")
         self.monitoring = True
         self.after_stop_polling_id = self.root.after(self.time_to_run * 60 * 1000, self.stop_monitoring)
@@ -184,12 +194,18 @@ class MainWindow:
 
     def stop_monitoring(self):
         self.timer_var.set("--")
+        # cancel polling if in progress
         if self.after_countdown_id:
             self.root.after_cancel(self.after_countdown_id)
             self.after_countdown_id = None
+        # cancel total run time if in progress
         if self.after_stop_polling_id:
             self.root.after_cancel(self.after_stop_polling_id)
             self.after_stop_polling_id = None
+        # cancel deferred start if in progress
+        if self.after_deferred_start_id:
+            self.root.after_cancel(self.after_deferred_start_id)
+            self.after_deferred_start_id = None
         self.start_monitoring_button.configure(state="!disabled")
         self.stop_monitoring_button.configure(state="disabled")
         self.monitoring = False
@@ -212,7 +228,6 @@ class MainWindow:
         self.monitor_log.insert(END, chars=f"{datetime.now().astimezone().strftime('%H:%M:%S')} - {message}\n")
         self.monitor_log.see(END)
         self.monitor_log["state"] = "disabled"
-        # TODO: scroll to end
 
     def select_interval_type(self):
         # enable/disable widget based on selected radio button
