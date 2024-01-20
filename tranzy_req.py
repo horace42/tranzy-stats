@@ -122,8 +122,10 @@ def get_vehicles(trip_id: str):
     except requests.exceptions.HTTPError as err:
         print(explain_error(str(err)))
         raise SystemExit(err)
-    # TODO treat requests.exceptions.ConnectionError (and timeout?)
     except requests.exceptions.ConnectionError as err:
+        print(err)
+        return []
+    except requests.exceptions.Timeout as err:
         print(err)
         return []
     else:

@@ -1,6 +1,7 @@
 """
-Configuration of constants
+Configuration of constants / defaults
 """
+
 # statistics collection duration
 TIME_TO_RUN = 30  # minutes
 # polling interval

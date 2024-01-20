@@ -2,9 +2,6 @@
 Functions for interaction with the database
 """
 
-from tranzy_db import *
-from tranzy_req import *
-
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
@@ -13,6 +10,8 @@ from datetime import timedelta, timezone
 from geopy import distance
 
 from config import MAX_DIST_TO_STOP, TIME_TOLERANCE
+from tranzy_db import *
+from tranzy_req import *
 
 
 def update_stops(session: Session):
@@ -215,14 +214,14 @@ def get_monitor_config(session: Session, trip_id) -> (Trip, list[Stop]):
     return row.Trip, stops_object_list
 
 
-def insert_position(session: Session, trip, vehicle, stops_object_list: list[Stop]):
+def insert_position(session: Session, trip, vehicle, stops_object_list: list[Stop]) -> (str, int):
     """
     Insert new position into db if it's close to the monitored stops
     :param session: The open Session to the db
     :param trip: Trip object
     :param vehicle: JSON from Tranzy API containing the position of a specific vehicle
     :param stops_object_list: Stop objects that must be closed to vehicle position
-    :return:
+    :return: Message to log, message type
     """
     dt = datetime.fromisoformat(vehicle['timestamp'])
     dt_now = datetime.now(timezone.utc)
@@ -235,9 +234,6 @@ def insert_position(session: Session, trip, vehicle, stops_object_list: list[Sto
 
         # check if closest stop is within a tolerable distance
         if min_distance <= MAX_DIST_TO_STOP:
-            print(f"{vehicle['label']}, {dt.astimezone().strftime('%H:%M:%S')}, {vehicle['speed']}, "
-                  f"{vehicle['latitude']}, {vehicle['longitude']} - "
-                  f"closest stop {closest_stop.stop_name} at {min_distance} meters")
             new_position = Position(
                 vehicle_no=vehicle['label'],
                 latitude=vehicle['latitude'],
@@ -250,11 +246,11 @@ def insert_position(session: Session, trip, vehicle, stops_object_list: list[Sto
             )
             session.add(new_position)
             session.commit()
+            return f"{vehicle['label']}, {dt.astimezone().strftime('%H:%M:%S')}, {closest_stop.stop_name} at {min_distance} meters", 1
         else:
-            print(F"{vehicle['label']} outside monitored segment - "
-                  F"closest stop {closest_stop.stop_name} at {min_distance} meters")
+            return f"{vehicle['label']} outside monitored segment", 2
     else:
-        print(f"Vehicle {vehicle['label']} skipped - bad datetime: {dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')}")
+        return f"{vehicle['label']} skipped - bad datetime: {dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')}", 2
 
 
 # TODO: results output - select distinct stops with smallest stop_distance from position?

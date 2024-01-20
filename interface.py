@@ -1,6 +1,9 @@
+"""
+Interface implementation
+"""
+
 from tkinter import *
 from tkinter import ttk
-from tkinter.font import Font
 from tkinter import messagebox
 
 from datetime import datetime, timedelta, time
@@ -8,19 +11,22 @@ from datetime import datetime, timedelta, time
 from sqlalchemy.orm import Session
 
 from config import POLLING_INTERVAL, TIME_TO_RUN, AGENCY_ID
-from tranzy_db_tools import get_monitored_trip
-from tranzy_req import get_agency_name
+from tranzy_db import Trip, Stop
+from tranzy_db_tools import get_monitored_trip, get_monitor_config, insert_position
+from tranzy_req import get_agency_name, get_vehicles
 
 
 class MainWindow:
     def __init__(self, r: Tk, s: Session):
         self.after_countdown_id = None  # id to cancel scheduling of countdown (single polling)
         self.after_stop_polling_id = None  # id to cancel scheduling of stop polling (time to run)
-        self.after_deferred_start_id = None  # id to cancel scheduling of deferred start
+        self.after_actual_start_id = None  # id to cancel scheduling of deferred start
         self.time_to_run = 5  # default time to run the polling (minutes)
         self.monitoring = False  # monitoring in progress
         self.trip_id = ""
         self.session = s
+        self.trip: Trip  # Trip objet to retrieve monitored trip details from db
+        self.stops_object_list: list[Stop]  # list of Stop objects to retrieve from db stops of monitored trip
 
         self.root = r
         self.root.minsize(width=1024, height=768)
@@ -148,8 +154,8 @@ class MainWindow:
         next_poll_label.grid(column=0, row=2)
 
         self.timer_var = StringVar(value="--")
-        timer_label = ttk.Label(right_frame, textvariable=self.timer_var, width=10)
-        timer_label.grid(column=1, row=2)
+        self.timer_label = ttk.Label(right_frame, textvariable=self.timer_var, width=10)
+        self.timer_label.grid(column=1, row=2)
 
         for child in right_frame.winfo_children():
             child.grid_configure(padx=5, pady=10)
@@ -164,9 +170,9 @@ class MainWindow:
         :param event: Bind event
         :return: None
         """
-        idxs = self.configured_trips.curselection()
-        if len(idxs) == 1:
-            idx = int(idxs[0])
+        idx_tuple = self.configured_trips.curselection()
+        if len(idx_tuple) == 1:
+            idx = int(idx_tuple[0])
             self.monitored_trip_var.set(value=self.trips_choices[idx])
             self.start_monitoring_button.configure(state="!disabled")
 
@@ -178,11 +184,12 @@ class MainWindow:
         self.start_monitoring_button.configure(state="disabled")
         self.stop_monitoring_button.configure(state="!disabled")
         self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
+        self.trip, self.stops_object_list = get_monitor_config(self.session, self.trip_id)
 
         # compute time to run based on selected radio button
         if self.interval_type_var.get() == "duration":
             self.time_to_run = int(self.minutes_var.get())
-            self.deferred_start()
+            self.actual_start()
         else:
             # compute start time and duration
             start_time = datetime.combine(datetime.today(),
@@ -197,24 +204,23 @@ class MainWindow:
             if start_time < datetime.now():
                 # fall back to default time to run in case end time is before start time
                 self.time_to_run = TIME_TO_RUN
-                wait_for = 0
                 self.write_log("start time in the past, starting now...")
-                self.deferred_start()
+                self.actual_start()
             else:
                 wait_for = int((start_time - datetime.now()).total_seconds() * 1000)
                 self.write_log(f"waiting until {start_time.astimezone().strftime('%H:%M:%S')}")
-                self.after_deferred_start_id = self.root.after(wait_for, self.deferred_start)
+                self.after_actual_start_id = self.root.after(wait_for, self.actual_start)
 
-    def deferred_start(self):
+    def actual_start(self):
         """
         Actual start of monitoring. Called with 'root.after' when timeframe radio button is selected.
         :return: None
         """
-        self.after_deferred_start_id = None
+        self.after_actual_start_id = None
         self.write_log(f"polling vehicles for trip {self.trip_id} for {self.time_to_run} minutes")
         self.monitoring = True
         self.after_stop_polling_id = self.root.after(self.time_to_run * 60 * 1000, self.stop_monitoring)
-        self.countdown(int(self.polling_interval_var.get()))
+        self.countdown(0)
 
     def stop_monitoring(self):
         """
@@ -231,9 +237,9 @@ class MainWindow:
             self.root.after_cancel(self.after_stop_polling_id)
             self.after_stop_polling_id = None
         # cancel deferred start if in progress
-        if self.after_deferred_start_id:
-            self.root.after_cancel(self.after_deferred_start_id)
-            self.after_deferred_start_id = None
+        if self.after_actual_start_id:
+            self.root.after_cancel(self.after_actual_start_id)
+            self.after_actual_start_id = None
         self.start_monitoring_button.configure(state="!disabled")
         self.stop_monitoring_button.configure(state="disabled")
         self.monitoring = False
@@ -249,11 +255,17 @@ class MainWindow:
         if timer > 0:
             self.after_countdown_id = self.root.after(1000, self.countdown, timer - 1)
         else:
-            # messagebox.showinfo(title="testing", message="Time's up!")
-            # TODO: poll vehicles
+            # poll vehicles from the API and insert in db
+            self.timer_var.set("--")
+            self.timer_label.update()
             if self.monitoring:
-                self.write_log("polling...", 1)
-                self.timer_var.set("--")
+                vehicles = get_vehicles(self.trip_id)
+                if not vehicles or len(vehicles) == 0:
+                    self.write_log("no vehicles on route", 2)
+                else:
+                    for v in vehicles:
+                        msg, msg_type = insert_position(self.session, self.trip, v, self.stops_object_list)
+                        self.write_log(msg, msg_type)
                 self.countdown(int(self.polling_interval_var.get()))
 
     def write_log(self, message, msg_type=0):
@@ -265,7 +277,8 @@ class MainWindow:
         """
         tags = ["information", "logged_position", "skipped_position"]
         self.monitor_log["state"] = "normal"
-        self.monitor_log.insert(END, f"{datetime.now().astimezone().strftime('%H:%M:%S')} - {message}\n", (tags[msg_type]))
+        self.monitor_log.insert(END, f"{datetime.now().astimezone().strftime('%H:%M:%S')} - {message}\n",
+                                (tags[msg_type]))
         self.monitor_log.see(END)
         self.monitor_log["state"] = "disabled"
 
