@@ -19,17 +19,11 @@ def main():
     # if os.path.isfile("tranzy.db"):
     #     os.remove("tranzy.db")
     Base.metadata.create_all(engine)
-
     session = Session(engine)
 
-    # populate configured_trips widget with the trips already stored in db
-    # TODO move to interface (to be call also after configuring new trip
-    configured_trips_list = get_monitored_trip(session)
-    if configured_trips_list:
-        for t in configured_trips_list:
-            line = f"{t.trip_id} - line {t.route_short_name} ({t.route_long_name}) to {t.trip_headsign}"
-            w.trips_choices.append(line)
-            w.trips_choices_var.set(w.trips_choices)
+    root = Tk()
+    root.title("Tranzy Stats")
+    w = MainWindow(root, session)
 
     # start monitoring
     start_monitoring = "n"  # input("Start monitoring? (y/n) ")
@@ -52,13 +46,9 @@ def main():
                         insert_position(session, trip, v, stops_object_list)
 
                 sleep(POLLING_INTERVAL)
+    root.mainloop()
     session.close()
 
 
 if __name__ == '__main__':
-    root = Tk()
-    root.title("Tranzy Stats")
-    w = MainWindow(root)
-    w.agency_name_var.set(get_agency_name(AGENCY_ID))
     main()
-    root.mainloop()

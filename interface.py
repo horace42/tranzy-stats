@@ -5,17 +5,22 @@ from tkinter import messagebox
 
 from datetime import datetime, timedelta, time
 
-from config import POLLING_INTERVAL, TIME_TO_RUN
+from sqlalchemy.orm import Session
+
+from config import POLLING_INTERVAL, TIME_TO_RUN, AGENCY_ID
+from tranzy_db_tools import get_monitored_trip
+from tranzy_req import get_agency_name
 
 
 class MainWindow:
-    def __init__(self, r: Tk):
+    def __init__(self, r: Tk, s: Session):
         self.after_countdown_id = None  # id to cancel scheduling of countdown (single polling)
         self.after_stop_polling_id = None  # id to cancel scheduling of stop polling (time to run)
         self.after_deferred_start_id = None  # id to cancel scheduling of deferred start
         self.time_to_run = 5  # default time to run the polling (minutes)
         self.monitoring = False  # monitoring in progress
         self.trip_id = ""
+        self.session = s
 
         self.root = r
         self.root.minsize(width=1024, height=768)
@@ -144,9 +149,9 @@ class MainWindow:
         for child in right_frame.winfo_children():
             child.grid_configure(padx=5, pady=10)
 
-        # self.monitor_log["state"] = "normal"
-        # for i in range(30):
-        #     self.monitor_log.insert(INSERT, chars=f"line {i}\n")
+        # init widgets
+        self.agency_name_var.set(get_agency_name(AGENCY_ID))
+        self.fill_configured_trips()
 
     def update_selected_trip(self, event):
         idxs = self.configured_trips.curselection()
@@ -249,3 +254,12 @@ class MainWindow:
             self.end_time_label.configure(state=NORMAL)
             self.end_hour_spin.configure(state=NORMAL)
             self.end_minute_spin.configure(state=NORMAL)
+
+    def fill_configured_trips(self):
+        # populate configured_trips widget with the trips already stored in db
+        configured_trips_list = get_monitored_trip(self.session)
+        if configured_trips_list:
+            for t in configured_trips_list:
+                line = f"{t.trip_id} - line {t.route_short_name} ({t.route_long_name}) to {t.trip_headsign}"
+                self.trips_choices.append(line)
+                self.trips_choices_var.set(self.trips_choices)
