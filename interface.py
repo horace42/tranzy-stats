@@ -57,23 +57,25 @@ class MainWindow:
 
         self.interval_type_var = StringVar(value="duration")
         duration_radio = ttk.Radiobutton(left_frame, text="Duration", width=15,
-                                         variable=self.interval_type_var, value="duration")
+                                         variable=self.interval_type_var, value="duration",
+                                         command=self.select_interval_type)
         duration_radio.grid(column=0, columnspan=2, row=7)
 
         timeframe_radio = ttk.Radiobutton(left_frame, text="Timeframe", width=15,
-                                          variable=self.interval_type_var, value="timeframe")
+                                          variable=self.interval_type_var, value="timeframe",
+                                          command=self.select_interval_type)
         timeframe_radio.grid(column=2, columnspan=2, row=7)
 
-        # TODO: visibility depending on the radio button selected
-        minutes_to_run_label = ttk.Label(left_frame, text="Run for (m):", width=15)
-        minutes_to_run_label.grid(column=0, row=8)
+        self.minutes_to_run_label = ttk.Label(left_frame, text="Run for (m):", width=15)
+        self.minutes_to_run_label.grid(column=0, row=8)
 
         self.minutes_var = StringVar(value=TIME_TO_RUN)
-        minutes_spin = ttk.Spinbox(left_frame, width=5, from_=10, to=90, increment=10, textvariable=self.minutes_var)
-        minutes_spin.grid(column=1, row=8)
+        self.minutes_spin = ttk.Spinbox(left_frame, width=5, from_=10, to=90, increment=10,
+                                        textvariable=self.minutes_var)
+        self.minutes_spin.grid(column=1, row=8)
 
-        start_time_label = ttk.Label(left_frame, text="Start time:", width=15)
-        start_time_label.grid(column=2, row=8)
+        self.start_time_label = ttk.Label(left_frame, text="Start time:", width=15, state=DISABLED)
+        self.start_time_label.grid(column=2, row=8)
 
         now = datetime.now()
         self.start_hour_var = StringVar(value=str(now.hour))
@@ -81,16 +83,16 @@ class MainWindow:
         start_frame = ttk.Frame(left_frame, width=100, height=20)
         start_frame.grid_propagate(False)
         start_frame.grid(column=3, row=8)
-        # TODO: check validity / restrict values for selecting time
-        start_hour_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=23, increment=1,
-                                      textvariable=self.start_hour_var)
-        start_minute_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=50, increment=10,
-                                        textvariable=self.start_minute_var)
-        start_hour_spin.grid(column=0, row=0)
-        start_minute_spin.grid(column=1, row=0)
+        # TODO: implement check in start_monitoring > default time if end time not valid
+        self.start_hour_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=23, increment=1,
+                                           textvariable=self.start_hour_var, state=DISABLED)
+        self.start_minute_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=50, increment=10,
+                                             textvariable=self.start_minute_var, state=DISABLED)
+        self.start_hour_spin.grid(column=0, row=0)
+        self.start_minute_spin.grid(column=1, row=0)
 
-        end_time_label = ttk.Label(left_frame, text="End time:", width=15)
-        end_time_label.grid(column=2, row=9)
+        self.end_time_label = ttk.Label(left_frame, text="End time:", width=15, state=DISABLED)
+        self.end_time_label.grid(column=2, row=9)
 
         now_30 = now + timedelta(minutes=30)
         self.end_hour_var = StringVar(value=str(now_30.hour))
@@ -98,12 +100,12 @@ class MainWindow:
         end_frame = ttk.Frame(left_frame, width=100, height=20)
         end_frame.grid_propagate(False)
         end_frame.grid(column=3, row=9)
-        end_hour_spin = ttk.Spinbox(end_frame, width=4, from_=0, to=23, increment=1,
-                                    textvariable=self.end_hour_var)
-        end_minute_spin = ttk.Spinbox(end_frame, width=4, from_=0, to=50, increment=10,
-                                      textvariable=self.end_minute_var)
-        end_hour_spin.grid(column=0, row=0)
-        end_minute_spin.grid(column=1, row=0)
+        self.end_hour_spin = ttk.Spinbox(end_frame, width=4, from_=0, to=23, increment=1,
+                                         textvariable=self.end_hour_var, state=DISABLED)
+        self.end_minute_spin = ttk.Spinbox(end_frame, width=4, from_=0, to=50, increment=10,
+                                           textvariable=self.end_minute_var, state=DISABLED)
+        self.end_hour_spin.grid(column=0, row=0)
+        self.end_minute_spin.grid(column=1, row=0)
 
         self.start_monitoring_button = ttk.Button(left_frame, width=30, text="Start monitoring",
                                                   command=self.start_monitoring)
@@ -195,3 +197,24 @@ class MainWindow:
         self.monitor_log.see(END)
         self.monitor_log["state"] = "disabled"
         # TODO: scroll to end
+
+    def select_interval_type(self):
+        # enable/disable widget based on selected radio button
+        if self.interval_type_var.get() == "duration":
+            self.minutes_to_run_label.configure(state=NORMAL)
+            self.minutes_spin.configure(state=NORMAL)
+            self.start_time_label.configure(state=DISABLED)
+            self.start_hour_spin.configure(state=DISABLED)
+            self.start_minute_spin.configure(state=DISABLED)
+            self.end_time_label.configure(state=DISABLED)
+            self.end_hour_spin.configure(state=DISABLED)
+            self.end_minute_spin.configure(state=DISABLED)
+        else:
+            self.minutes_to_run_label.configure(state=DISABLED)
+            self.minutes_spin.configure(state=DISABLED)
+            self.start_time_label.configure(state=NORMAL)
+            self.start_hour_spin.configure(state=NORMAL)
+            self.start_minute_spin.configure(state=NORMAL)
+            self.end_time_label.configure(state=NORMAL)
+            self.end_hour_spin.configure(state=NORMAL)
+            self.end_minute_spin.configure(state=NORMAL)
