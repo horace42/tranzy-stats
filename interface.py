@@ -135,6 +135,11 @@ class MainWindow:
                                 background="white", padx=10, pady=10)
         self.monitor_log.grid(column=0, row=0, sticky="NWES")
 
+        # log tags
+        self.monitor_log.tag_configure("information", foreground="blue")
+        self.monitor_log.tag_configure("logged_position", foreground="green")
+        self.monitor_log.tag_configure("skipped_position", foreground="gray")
+
         self.log_scroll = ttk.Scrollbar(log_frame, orient=VERTICAL, command=self.monitor_log.yview)
         self.log_scroll.grid(column=1, row=0, sticky="NS")
         self.monitor_log.configure(yscrollcommand=self.log_scroll.set)
@@ -247,7 +252,7 @@ class MainWindow:
             # messagebox.showinfo(title="testing", message="Time's up!")
             # TODO: poll vehicles
             if self.monitoring:
-                self.write_log("polling...")
+                self.write_log("polling...", 1)
                 self.timer_var.set("--")
                 self.countdown(int(self.polling_interval_var.get()))
 
@@ -255,12 +260,12 @@ class MainWindow:
         """
         Writes a message at the end of monitor_log widgets, and scrolls to the end
         :param message: Message to write
-        :param msg_type: 0 - information, 1 - vehicle position logged in db
+        :param msg_type: 0 - information, 1 - vehicle position logged in db, 2 - skipped vehicles
         :return: None
         """
-        # TODO: use different color for vehicle positions
+        tags = ["information", "logged_position", "skipped_position"]
         self.monitor_log["state"] = "normal"
-        self.monitor_log.insert(END, chars=f"{datetime.now().astimezone().strftime('%H:%M:%S')} - {message}\n")
+        self.monitor_log.insert(END, f"{datetime.now().astimezone().strftime('%H:%M:%S')} - {message}\n", (tags[msg_type]))
         self.monitor_log.see(END)
         self.monitor_log["state"] = "disabled"
 
