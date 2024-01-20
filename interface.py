@@ -360,7 +360,7 @@ class MainWindow:
 
         self.stops_choices = []
         self.stops_choices_var = StringVar(value=self.stops_choices)
-        stops_list = Listbox(add_trip_frame, width=30, height=15, selectmode=EXTENDED, listvariable=self.stops_choices_var)
+        stops_list = Listbox(add_trip_frame, width=30, height=15, state=DISABLED, selectmode=EXTENDED, listvariable=self.stops_choices_var)
         stops_list.grid(column=1, row=3)
         stops_list.bind('<<ListboxSelect>>', self.stops_selected)
 
@@ -386,6 +386,6 @@ class MainWindow:
     def commit_trip(self):
         pass
 
-    def stops_selected(self):
+    def stops_selected(self, event):
         self.add_trip_button.configure(state=NORMAL)
         pass
