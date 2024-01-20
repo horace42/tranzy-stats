@@ -154,26 +154,6 @@ def config_monitored_trip(session: Session):
         pass
 
 
-def select_monitored_trip(session: Session):
-    """
-    Obsolete - used in non-GUI version
-    :param session:
-    :return:
-    """
-    stmt = select(Trip).order_by(Trip.route_short_name)
-    print("Following trips are configured for monitoring:")
-    trip_id_list = []
-    for trip_obj in session.execute(stmt).scalars().all():
-        print(f"     {trip_obj.trip_id} - line {trip_obj.route_short_name} "
-              f"({trip_obj.route_long_name}) to {trip_obj.trip_headsign}")
-        trip_id_list.append(trip_obj.trip_id)
-    trip_id = input("Input the trip ID to monitor (exit to menu for other values): ")
-    if trip_id in trip_id_list:
-        return trip_id
-    else:
-        return None
-
-
 def get_monitored_trip(session: Session):
     """
     Retrieve trips configured for monitoring

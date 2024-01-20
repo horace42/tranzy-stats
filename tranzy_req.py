@@ -32,38 +32,6 @@ def explain_error(s: str) -> str:
         return "Unknown error"
 
 
-def select_agency():
-    """
-    !!!!! NOT USED
-    Display list of agencies and get input from user.
-    !!!!! Token is linked to agency, so this will work only if multiple tokens are implemented
-    """
-    if "X-Agency-Id" in headers:
-        headers.pop("X-Agency-Id")
-    try:
-        response = requests.get(url=f"{TRANZY_URL}{AGENCY}", headers=headers)
-        response.raise_for_status()
-    except requests.exceptions.HTTPError as err:
-        print(explain_error(str(err)))
-        raise SystemExit(err)
-    else:
-        for a in response.json():
-            print(f"{a['agency_id']} - {a['agency_name']}")
-        agency_id = -1
-        while agency_id not in [a['agency_id'] for a in response.json()]:
-            agency_id = int(input("Input agency: "))
-        set_agency(agency_id)
-
-
-def set_agency(agency_id: int):
-    """
-    !!!!! NOT USED
-    Set agency in request headers.
-    :param agency_id: Agency to query in the API
-    """
-    headers["X-Agency-Id"] = str(agency_id)
-
-
 def get_agency_name(agency_id: str):
     headers_ag = {k: headers[k] for k in headers if k != "X-Agency-Id"}
     try:

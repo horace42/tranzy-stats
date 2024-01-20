@@ -321,5 +321,71 @@ class MainWindow:
 
     def add_trip(self):
         # TODO new window to add trip
-        messagebox.showinfo(message="WIP")
+        add_trip_window = Toplevel(self.root)
+        add_trip_frame = ttk.Frame(add_trip_window, width=500, height=400)
+        add_trip_frame.grid_propagate(False)
+        add_trip_frame.grid(column=0, row=0)
+
+        line_number_label = ttk.Label(add_trip_frame, text="Line number:")
+        line_number_label.grid(column=0, row=0)
+
+        self.line_number_var = StringVar(value="")
+        self.line_number_var.trace_add("write", lambda *args: self.search_trips_button.configure(state=NORMAL))
+        line_number_entry = ttk.Entry(add_trip_frame, width=10, textvariable=self.line_number_var)
+        line_number_entry.grid(column=1, row=0, sticky="W")
+
+        self.search_trips_button = ttk.Button(add_trip_frame, width=30, text="Search trips", state=DISABLED, command=self.search_trips)
+        self.search_trips_button.grid(column=2, row=0)
+
+        self.trips_var = StringVar(value="0")
+        trip0_radio = ttk.Radiobutton(add_trip_frame, text="Trip 0", width=10, variable=self.trips_var, value="0", state=DISABLED, command=self.select_trip_dir)
+        trip0_radio.grid(column=0, row=1)
+
+        self.trip0_var = StringVar(value="")
+        trip0_label = ttk.Label(add_trip_frame, width=30, textvariable=self.trip0_var)
+        trip0_label.grid(column=1, row=1)
+
+        trip1_radio = ttk.Radiobutton(add_trip_frame, text="Trip 1", width=10, variable=self.trips_var, value="1", state=DISABLED, command=self.select_trip_dir)
+        trip1_radio.grid(column=0, row=2)
+
+        self.trip1_var = StringVar(value="")
+        trip1_label = ttk.Label(add_trip_frame, width=30, textvariable=self.trip1_var)
+        trip1_label.grid(column=1, row=2)
+
+        self.search_stops_button = ttk.Button(add_trip_frame, width=30, text="Search stops", state=DISABLED, command=self.search_stops)
+        self.search_stops_button.grid(column=2, row=1, rowspan=2)
+
+        stops_label = ttk.Label(add_trip_frame, text="Stops:", state=DISABLED)
+        stops_label.grid(column=0, row=3)
+
+        self.stops_choices = []
+        self.stops_choices_var = StringVar(value=self.stops_choices)
+        stops_list = Listbox(add_trip_frame, width=30, height=15, selectmode=EXTENDED, listvariable=self.stops_choices_var)
+        stops_list.grid(column=1, row=3)
+        stops_list.bind('<<ListboxSelect>>', self.stops_selected)
+
+        self.add_trip_button = ttk.Button(add_trip_frame, width=30, text="Add trip", state=DISABLED, command=self.commit_trip)
+        self.add_trip_button.grid(column=2, row=3)
+
+        for child in add_trip_frame.winfo_children():
+            child.grid_configure(padx=5, pady=10)
+
+        line_number_entry.focus()
         self.fill_configured_trips()
+
+    def search_trips(self):
+        # messagebox.showinfo(title="test", message=self.line_number_var.get())
+        pass
+
+    def select_trip_dir(self, event):
+        pass
+
+    def search_stops(self):
+        pass
+
+    def commit_trip(self):
+        pass
+
+    def stops_selected(self):
+        self.add_trip_button.configure(state=NORMAL)
+        pass
