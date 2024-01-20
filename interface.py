@@ -3,7 +3,7 @@ from tkinter import ttk
 from tkinter.font import Font
 from tkinter import messagebox
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 
 from config import POLLING_INTERVAL, TIME_TO_RUN
 
@@ -159,8 +159,24 @@ class MainWindow:
         self.start_monitoring_button.configure(state="disabled")
         self.stop_monitoring_button.configure(state="!disabled")
         self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
-        # call stop_monitoring after the set running time
-        # TODO: compute self.time_to_run depending on chosen radiobutton
+
+        # compute time to run based on selected radio button
+        if self.interval_type_var.get() == "duration":
+            self.time_to_run = int(self.minutes_var.get())
+        else:
+            start_time = datetime.combine(datetime.today(),
+                                          time(int(self.start_hour_var.get()), int(self.start_minute_var.get())))
+            end_time = datetime.combine(datetime.today(),
+                                        time(int(self.end_hour_var.get()), int(self.end_minute_var.get())))
+            if start_time < end_time:
+                self.time_to_run = int((end_time - start_time).total_seconds() // 60)
+            else:
+                # fall back to default time to run in case end time is before start time
+                self.time_to_run = TIME_TO_RUN
+            if start_time < datetime.now():
+                # fall back to default time to run in case end time is before start time
+                self.time_to_run = TIME_TO_RUN
+            # TODO: implement wait until start time
         self.write_log(f"polling vehicles for trip {self.trip_id} for {self.time_to_run} minutes")
         self.monitoring = True
         self.after_stop_polling_id = self.root.after(self.time_to_run * 60 * 1000, self.stop_monitoring)
