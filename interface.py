@@ -5,12 +5,17 @@ from tkinter import messagebox
 
 from datetime import datetime, timedelta
 
-from config import POLLING_INTERVAL
+from config import POLLING_INTERVAL, TIME_TO_RUN
 
 
 class MainWindow:
     def __init__(self, r: Tk):
-        self.after_countdown_id = None
+        self.after_countdown_id = None  # id to cancel scheduling of countdown (single polling)
+        self.after_stop_polling_id = None  # id to cancel scheduling of stop polling (time to run)
+        self.time_to_run = 5  # default time to run the polling (minutes)
+        self.monitoring = False  # monitoring in progress
+        self.trip_id = ""
+
         self.root = r
         self.root.minsize(width=1024, height=768)
 
@@ -63,7 +68,7 @@ class MainWindow:
         minutes_to_run_label = ttk.Label(left_frame, text="Run for (m):", width=15)
         minutes_to_run_label.grid(column=0, row=8)
 
-        self.minutes_var = StringVar(value="30")
+        self.minutes_var = StringVar(value=TIME_TO_RUN)
         minutes_spin = ttk.Spinbox(left_frame, width=5, from_=10, to=90, increment=10, textvariable=self.minutes_var)
         minutes_spin.grid(column=1, row=8)
 
@@ -76,6 +81,7 @@ class MainWindow:
         start_frame = ttk.Frame(left_frame, width=100, height=20)
         start_frame.grid_propagate(False)
         start_frame.grid(column=3, row=8)
+        # TODO: check validity / restrict values for selecting time
         start_hour_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=23, increment=1,
                                       textvariable=self.start_hour_var)
         start_minute_spin = ttk.Spinbox(start_frame, width=4, from_=0, to=50, increment=10,
@@ -101,12 +107,13 @@ class MainWindow:
 
         self.start_monitoring_button = ttk.Button(left_frame, width=30, text="Start monitoring",
                                                   command=self.start_monitoring)
-        self.start_monitoring_button.state([DISABLED])
+        self.start_monitoring_button.state(["disabled"])
         self.start_monitoring_button.grid(column=0, columnspan=4, row=10)
 
-        stop_monitoring_button = ttk.Button(left_frame, width=30, text="Stop monitoring")
-        stop_monitoring_button.state([DISABLED])
-        stop_monitoring_button.grid(column=0, columnspan=4, row=11)
+        self.stop_monitoring_button = ttk.Button(left_frame, width=30, text="Stop monitoring",
+                                                 command=self.stop_monitoring)
+        self.stop_monitoring_button.state(["disabled"])
+        self.stop_monitoring_button.grid(column=0, columnspan=4, row=11)
 
         for child in left_frame.winfo_children():
             child.grid_configure(padx=5, pady=10)
@@ -115,48 +122,76 @@ class MainWindow:
         monitored_trip_label = ttk.Label(right_frame, textvariable=self.monitored_trip_var)
         monitored_trip_label.grid(column=0, columnspan=2, row=0)
 
-        self.monitor_log = Text(right_frame, width=64, height=20, state=DISABLED, wrap=WORD,
+        log_frame = ttk.Frame(right_frame, width=64, height=20)
+        log_frame.grid(column=0, columnspan=2, row=1)
+        self.monitor_log = Text(log_frame, width=62, height=20, state=DISABLED, wrap=WORD,
                                 background="white", padx=10, pady=10)
-        self.monitor_log.grid(column=0, columnspan=2, row=1, rowspan=10)
+        self.monitor_log.grid(column=0, row=0, sticky="NWES")
+
+        self.log_scroll = ttk.Scrollbar(log_frame, orient=VERTICAL, command=self.monitor_log.yview)
+        self.log_scroll.grid(column=1, row=0, sticky="NS")
+        self.monitor_log.configure(yscrollcommand=self.log_scroll.set)
 
         next_poll_label = ttk.Label(right_frame, text="Next poll in (s):", width=30)
-        next_poll_label.grid(column=0, row=11)
+        next_poll_label.grid(column=0, row=2)
 
         self.timer_var = StringVar(value="--")
         timer_label = ttk.Label(right_frame, textvariable=self.timer_var, width=10)
-        timer_label.grid(column=1, row=11)
+        timer_label.grid(column=1, row=2)
 
         for child in right_frame.winfo_children():
             child.grid_configure(padx=5, pady=10)
+
+        # self.monitor_log["state"] = "normal"
+        # for i in range(30):
+        #     self.monitor_log.insert(INSERT, chars=f"line {i}\n")
 
     def update_selected_trip(self, event):
         idxs = self.configured_trips.curselection()
         if len(idxs) == 1:
             idx = int(idxs[0])
             self.monitored_trip_var.set(value=self.trips_choices[idx])
-            self.start_monitoring_button.state(["!disabled"])
+            self.start_monitoring_button.configure(state="!disabled")
 
     def start_monitoring(self):
-        if self.after_countdown_id:
-            # there's a countdown in progress
-            # TODO: move code in stop monitoring func, add after call for getting vehicles
-            self.timer_var.set("--")
-            self.root.after_cancel(self.after_countdown_id)
-            self.after_countdown_id = None
-        self.start_monitoring_button.state(["disabled"])
-        trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
-        messagebox.showinfo(title="testing", message=f"Trip ID: |{trip_id}|")
+        self.start_monitoring_button.configure(state="disabled")
+        self.stop_monitoring_button.configure(state="!disabled")
+        self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
+        # call stop_monitoring after the set running time
+        # TODO: compute self.time_to_run depending on chosen radiobutton
+        self.write_log(f"polling vehicles for trip {self.trip_id} for {self.time_to_run} minutes")
+        self.monitoring = True
+        self.after_stop_polling_id = self.root.after(self.time_to_run * 60 * 1000, self.stop_monitoring)
         self.countdown(int(self.polling_interval_var.get()))
-        self.stop_monitoring()
 
     def stop_monitoring(self):
-        self.start_monitoring_button.state(["!disabled"])
+        self.timer_var.set("--")
+        if self.after_countdown_id:
+            self.root.after_cancel(self.after_countdown_id)
+            self.after_countdown_id = None
+        if self.after_stop_polling_id:
+            self.root.after_cancel(self.after_stop_polling_id)
+            self.after_stop_polling_id = None
+        self.start_monitoring_button.configure(state="!disabled")
+        self.stop_monitoring_button.configure(state="disabled")
+        self.monitoring = False
+        self.write_log("polling stopped")
 
     def countdown(self, timer: int):
         self.timer_var.set(value=str(timer))
         if timer > 0:
             self.after_countdown_id = self.root.after(1000, self.countdown, timer - 1)
         else:
-            messagebox.showinfo(title="testing", message="Time's up!")
-            self.timer_var.set("--")
-            self.after_countdown_id = None
+            # messagebox.showinfo(title="testing", message="Time's up!")
+            # TODO: poll vehicles
+            if self.monitoring:
+                self.write_log("polling...")
+                self.timer_var.set("--")
+                self.countdown(int(self.polling_interval_var.get()))
+
+    def write_log(self, message):
+        self.monitor_log["state"] = "normal"
+        self.monitor_log.insert(END, chars=f"{datetime.now().astimezone().strftime('%H:%M:%S')} - {message}\n")
+        self.monitor_log.see(END)
+        self.monitor_log["state"] = "disabled"
+        # TODO: scroll to end
