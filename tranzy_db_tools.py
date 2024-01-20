@@ -16,6 +16,11 @@ from config import MAX_DIST_TO_STOP, TIME_TOLERANCE
 
 
 def update_stops(session: Session):
+    """
+    Refresh stops from API
+    :param session: db session
+    :return: None
+    """
     stops = get_stops()
     stop_id_list = []
     for s in stops:
@@ -49,6 +54,11 @@ def update_stops(session: Session):
 
 
 def config_monitored_trip(session: Session):
+    """
+    Configure a new monitored trip - non GUI
+    :param session: db session
+    :return: None
+    """
     # update stops
     update_stops(session)
 
@@ -146,6 +156,11 @@ def config_monitored_trip(session: Session):
 
 
 def select_monitored_trip(session: Session):
+    """
+    Obsolete - used in non-GUI version
+    :param session:
+    :return:
+    """
     stmt = select(Trip).order_by(Trip.route_short_name)
     print("Following trips are configured for monitoring:")
     trip_id_list = []
@@ -161,8 +176,13 @@ def select_monitored_trip(session: Session):
 
 
 def get_monitored_trip(session: Session):
+    """
+    Retrieve trips configured for monitoring
+    :param session:
+    :return: List of Trip objects
+    """
     stmt = select(Trip).order_by(Trip.route_short_name)
-    trip_obj_list =session.execute(stmt).scalars().all()
+    trip_obj_list = session.execute(stmt).scalars().all()
     if trip_obj_list:
         return trip_obj_list
     else:
