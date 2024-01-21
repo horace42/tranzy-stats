@@ -24,6 +24,7 @@ class AddTripWindow:
         self.end_stop = 0  # stop order to end monitoring
 
         self.add_trip_window = Toplevel(self.root)
+        self.add_trip_window.title("Add trip")
         add_trip_frame = ttk.Frame(self.add_trip_window, width=500, height=400)
         add_trip_frame.grid_propagate(False)
         add_trip_frame.grid(column=0, row=0)
@@ -204,8 +205,12 @@ class AddTripWindow:
         """
         self.add_trip_button.configure(state=NORMAL)
         idx_tuple = self.stops_list.curselection()
-        self.start_stop = min(idx_tuple)
-        self.end_stop = max(idx_tuple)
+        if len(idx_tuple) > 1:
+            self.start_stop = min(idx_tuple)
+            self.end_stop = max(idx_tuple)
+        else:
+            self.start_stop = 0
+            self.end_stop = 0
 
     def window_close(self):
         """
