@@ -10,7 +10,7 @@ Then it grew to exercise my Python beginner skills.
 * Single trip monitoring at once
 * Collect statistics only between specific stops
 * Start immediately for a specific period in minutes
-* Run between specific times (deferred start)
+  * or run between specific times (deferred start)
 * Configurable polling interval in seconds
 * Configure and save multiple trips for monitoring
 * Realtime logs highlighting saved statistics
@@ -30,7 +30,7 @@ Please report any bugs or issues using the contact form at: https://tranzy.dev/a
 
 Terms and conditions: https://tranzy.dev/accounts/terms-and-conditions
 ### API token
-Create an account and tokens per agency:
+Create an account and application per agency:
 https://tranzy.dev/accounts/my-apps
 ### API agencies
 * SCTP Iasi
