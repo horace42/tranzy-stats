@@ -2,11 +2,6 @@
 Configuration of constants / defaults
 """
 
-# statistics collection duration
-TIME_TO_RUN = 30  # minutes
-# polling interval
-POLLING_INTERVAL = 30  # seconds
-
 # API key and endpoints
 # Get your API key here (use Edge if Chrome doesn't work):
 # https://tranzy.dev/accounts/my-apps
@@ -23,9 +18,13 @@ SHAPES = "shapes"  # not used (route GPS coordinates)
 STOPS = "stops"
 STOP_TIMES = "stop_times"
 
+# statistics collection default duration
+TIME_TO_RUN = 30  # minutes
+# default polling interval
+POLLING_INTERVAL = 30  # seconds
 # maximum distance from a vehicle to a stop to log the position
-# a smaller value could filter out some positions between stops
-# a bigger value will log positions outside the monitored segment
+#  - a smaller value could filter out some positions between stops
+#  - a bigger value will log positions outside the monitored segment
 MAX_DIST_TO_STOP = 300
 # tolerance in seconds (+/-) for vehicle datetime
 TIME_TOLERANCE = 60
