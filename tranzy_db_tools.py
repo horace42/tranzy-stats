@@ -52,106 +52,10 @@ def update_stops(session: Session):
         print("No stops to update.")
 
 
-def config_monitored_trip(session: Session):
-    """
-    Configure a new monitored trip - non GUI
-    :param session: db session
-    :return: None
-    """
-    # update stops
-    update_stops(session)
-
-    # get user input for line number and trip direction
-    line_number = ""
-    while line_number == "":
-        line_number = input("Input the desired line number (0 to skip): ")
-
-    if line_number != "0":
-        route = get_route(line_number)
-        if route:
-            print(f"Route found: {route[0]['route_short_name']} - {route[0]['route_long_name']}")
-            route_trips = get_trips(route[0]["route_id"])
-            print("with following trips:")
-            print(f"     {route_trips[0]['direction_id']} - {route[0]['route_short_name']} "
-                  f"towards {route_trips[0]['trip_headsign']}")
-            print(f"     {route_trips[1]['direction_id']} - {route[0]['route_short_name']} "
-                  f"towards {route_trips[1]['trip_headsign']}")
-            direction = -1
-            while direction not in [0, 1]:
-                direction = int(input("Input the desired direction (0 / 1): "))
-            if route_trips[0]["direction_id"] == direction:
-                route_trip = route_trips[0]
-            else:
-                route_trip = route_trips[1]
-
-            # create Trip object for user's choice
-            # TODO: check if already imported
-            t = Trip(
-                agency_id=AGENCY_ID,
-                route_id=route[0]["route_id"],
-                trip_id=route_trip["trip_id"],
-                shape_id=route_trip["shape_id"],
-                route_short_name=route[0]["route_short_name"],
-                route_long_name=route[0]["route_long_name"],
-                trip_headsign=route_trip["trip_headsign"],
-                monitored=True
-            )
-
-            # retrieve stops order for selected trip
-            stops_order = get_stop_order(route_trip["trip_id"])
-            stop_id_list = [s_o["stop_id"] for s_o in stops_order]
-
-            # retrieve corresponding stops from db
-            stmt = select(Stop).where(Stop.stop_id.in_(stop_id_list))
-            result = session.execute(stmt)
-            stop_object_list = result.scalars().all()
-
-            # create objects for stops order
-            stops_order_object_list = []
-            print(f"List of stops for {route[0]['route_short_name']} to {route_trip['trip_headsign']}:")
-            stop_order_numbers = []  # stop order list to be used for input validation
-            for s_o in stops_order:
-                # enumerate all trip's stops
-                try:
-                    stop_idx, stop_name = next((item.idx, item.stop_name) for item in stop_object_list if item.stop_id == s_o["stop_id"])
-                except StopIteration:
-                    print(f"Stop {s_o['stop_id']} not found in db!")
-                else:
-                    # corresponding stop object found in db
-                    # create StopOrder object linked to Stop object
-                    stops_order_object_list.append(StopOrder(
-                        stop_order=s_o["stop_sequence"],
-                        trip=t,
-                        stop_idx=stop_idx
-                    ))
-                    stop_order_numbers.append(s_o["stop_sequence"])
-                    print(f"     {s_o['stop_sequence']} - {stop_name}")
-            s_start = -1
-            s_end = -1
-            while s_start not in stop_order_numbers \
-                    or s_end not in stop_order_numbers \
-                    or s_start >= s_end:
-                s_start = int(input("Input first stop: "))
-                s_end = int(input("Input last stop: "))
-
-            # create object for monitored stops
-            m = MonitoredStops(
-                start_stop=s_start,
-                end_stop=s_end,
-                trip=t
-            )
-
-            # commit objects to db
-            session.add(t)
-            session.add_all(stops_order_object_list)
-            session.add(m)
-            session.commit()
-            print("Trip configured for monitoring")
-        else:
-            # route not found
-            print(f"Route for '{line_number}' not found!")
-    else:
-        pass
+def get_route_stops(session: Session, stop_id_list):
+    stmt = select(Stop).where(Stop.stop_id.in_(stop_id_list))
+    result = session.execute(stmt)
+    return result.scalars().all()
 
 
 def get_monitored_trip(session: Session):
@@ -207,7 +111,8 @@ def insert_position(session: Session, trip, vehicle, stops_object_list: list[Sto
     dt_now = datetime.now(timezone.utc)
     if dt_now - timedelta(seconds=TIME_TOLERANCE) < dt < dt_now + timedelta(seconds=TIME_TOLERANCE):
         # calculate distance to each monitored stop and get the closest stop
-        distance_list = [distance.distance((vehicle['latitude'], vehicle['longitude']), (s.stop_lat, s.stop_lon)).m for s in stops_object_list]
+        distance_list = [distance.distance((vehicle['latitude'], vehicle['longitude']),
+                                           (s.stop_lat, s.stop_lon)).m for s in stops_object_list]
         min_distance = min(distance_list)
         closest_stop = stops_object_list[distance_list.index(min_distance)]
         min_distance = int(round(min_distance, 0))
@@ -226,7 +131,8 @@ def insert_position(session: Session, trip, vehicle, stops_object_list: list[Sto
             )
             session.add(new_position)
             session.commit()
-            return f"{vehicle['label']}, {dt.astimezone().strftime('%H:%M:%S')}, {closest_stop.stop_name} at {min_distance} meters", 1
+            return f"{vehicle['label']}, {dt.astimezone().strftime('%H:%M:%S')}, " \
+                   f"{closest_stop.stop_name} at {min_distance} meters", 1
         else:
             return f"{vehicle['label']} outside monitored segment", 2
     else:

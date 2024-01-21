@@ -60,7 +60,8 @@ def get_route(line_number: str):
         print(explain_error(str(err)))
         raise SystemExit(err)
     else:
-        return [r for r in response.json() if r["route_short_name"] == line_number]
+        return [r for r in response.json()
+                if r["route_short_name"] in (line_number, line_number.upper(), line_number.lower())]
 
 
 def get_trips(route_id: int):
@@ -122,6 +123,7 @@ def get_stop_order(trip_id: str):
             return [s for s in response.json() if s["trip_id"] == trip_id]
         else:
             print(f"{datetime.now().astimezone().strftime('%H:%M:%S')} Invalid data for stop_times: {data}")
+            return []
 
 
 def get_stops(stops_list: list[int] = None):
