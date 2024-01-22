@@ -11,7 +11,7 @@ from geopy import distance
 
 import csv
 
-from config import MAX_DIST_TO_STOP, TIME_TOLERANCE
+from config import MAX_DIST_TO_STOP, TIME_TOLERANCE, CSV_ENC
 from tranzy_db import *
 from tranzy_req import *
 
@@ -142,10 +142,17 @@ def insert_position(session: Session, trip, vehicle, stops_object_list: list[Sto
 
 
 def export_csv(session: Session, trip_id):
-    stmt = select(Trip.idx, Trip.agency_id, Trip.trip_id, Trip.route_short_name, Trip.route_long_name, Trip.trip_headsign, Position.vehicle_no, Position.latitude, Position.longitude, Position.timestamp, Position.speed, Position.stop_distance, Stop.stop_name).join_from(Trip, Position).join_from(Position, Stop).where(Trip.trip_id == trip_id)
+    stmt = select(Trip.idx, Trip.agency_id, Trip.trip_id,
+                  Trip.route_short_name, Trip.route_long_name, Trip.trip_headsign,
+                  Position.vehicle_no, Position.latitude, Position.longitude,
+                  Position.timestamp, Position.speed, Position.stop_distance,
+                  Stop.stop_name)\
+        .join_from(Trip, Position)\
+        .join_from(Position, Stop)\
+        .where(Trip.trip_id == trip_id)
     results = session.execute(stmt).all()
     file_name = f"exports/tranzy_{trip_id}_{datetime.now().astimezone().strftime('%Y%m%d_%H%M%S')}.csv"
-    with open(file_name,"w", newline='', encoding="utf-8-sig") as f:
+    with open(file_name,"w", newline='', encoding=CSV_ENC) as f:
         writer = csv.writer(f, delimiter=",", dialect="excel")
         writer.writerow(results[0]._fields)
         writer.writerows(results)

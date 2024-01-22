@@ -17,6 +17,8 @@ Then it grew to exercise my Python beginner skills.
 * Display seconds until next poll
 ### Config file
 Configure API endpoints, default values and tolerable distance and time.
+### Export
+Export trip statistics to csv (encoding configurable, default UTF-8 BOM)
 ## Database
 SQLite using SQLAlchemy ORM
 ![Database schema](/images/tranzy.db.png)

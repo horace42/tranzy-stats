@@ -28,3 +28,6 @@ POLLING_INTERVAL = 30  # seconds
 MAX_DIST_TO_STOP = 300
 # tolerance in seconds (+/-) for vehicle datetime
 TIME_TOLERANCE = 60
+
+# encoding for csv export (use utf-8-sig for UTF-8 BOM)
+CSV_ENC = "utf-8-sig"
