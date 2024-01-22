@@ -11,7 +11,7 @@ from interface import MainWindow
 def main():
 
     # connect to db
-    engine = create_engine("sqlite+pysqlite:///tranzy.db", echo=False)
+    engine = create_engine("sqlite+pysqlite:///tranzy.db?charset=utf8mb4", echo=False)
     Base.metadata.create_all(engine)
     session = Session(engine)
 

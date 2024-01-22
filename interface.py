@@ -3,7 +3,7 @@ Interface implementation
 """
 
 from tkinter import *
-from tkinter import ttk
+from tkinter import ttk, messagebox
 
 from datetime import datetime, timedelta, time
 
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from config import POLLING_INTERVAL, TIME_TO_RUN, AGENCY_ID
 from tranzy_db import Trip, Stop
-from tranzy_db_tools import get_monitored_trip, get_monitor_config, insert_position
+from tranzy_db_tools import get_monitored_trips, get_monitor_config, insert_position, export_csv
 from tranzy_req import get_agency_name, get_vehicles
 
 
@@ -57,16 +57,22 @@ class MainWindow:
 
         self.trips_choices = []
         self.trips_choices_var = StringVar(value=self.trips_choices)
-        self.configured_trips = Listbox(left_frame, width=60, height=10,
+        self.configured_trips = Listbox(left_frame, width=65, height=10,
                                         selectmode=BROWSE, listvariable=self.trips_choices_var)
         self.configured_trips.grid(column=0, columnspan=4, row=1, rowspan=5)
         # when selection changes update the monitored_trip_label var
         self.configured_trips.bind('<<ListboxSelect>>', self.update_selected_trip)
 
-        self.configure_trip_button = ttk.Button(left_frame, width=30, text="Configure new trip", command=self.add_trip)
-        self.configure_trip_button.grid(column=0, columnspan=4, row=6)
+        self.configure_trip_button = ttk.Button(left_frame, width=20, text="Configure new trip", command=self.add_trip)
+        self.configure_trip_button.grid(column=0, columnspan=2, row=6)
 
-        # TODO: delete trip button
+        self.export_trip_button = ttk.Button(left_frame, width=10, text="Export",
+                                             command=self.export_trip, state="disabled")
+        self.export_trip_button.grid(column=2, row=6)
+
+        self.delete_trip_button = ttk.Button(left_frame, width=10, text="Delete",
+                                             command=self.delete_trip, state="disabled")
+        self.delete_trip_button.grid(column=3, row=6)
 
         self.interval_type_var = StringVar(value="duration")
         duration_radio = ttk.Radiobutton(left_frame, text="Duration", width=15,
@@ -177,6 +183,8 @@ class MainWindow:
             self.monitored_trip_var.set(value=self.trips_choices[idx])
             if not self.monitoring:
                 self.start_monitoring_button.configure(state="!disabled")
+                self.export_trip_button.configure(state="!disabled")
+                self.delete_trip_button.configure(state="!disabled")
 
     def start_monitoring(self):
         """
@@ -185,9 +193,21 @@ class MainWindow:
         """
         self.start_monitoring_button.configure(state="disabled")
         self.stop_monitoring_button.configure(state="!disabled")
+        self.configured_trips.configure(state=DISABLED)
+        self.export_trip_button.configure(state="disabled")
+        self.delete_trip_button.configure(state="disabled")
         self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
         self.trip, self.stops_object_list = get_monitor_config(self.session, self.trip_id)
 
+        # disable widgets under radio buttons
+        self.minutes_to_run_label.configure(state=DISABLED)
+        self.minutes_spin.configure(state=DISABLED)
+        self.start_time_label.configure(state=DISABLED)
+        self.start_hour_spin.configure(state=DISABLED)
+        self.start_minute_spin.configure(state=DISABLED)
+        self.end_time_label.configure(state=DISABLED)
+        self.end_hour_spin.configure(state=DISABLED)
+        self.end_minute_spin.configure(state=DISABLED)
         # compute time to run based on selected radio button
         if self.interval_type_var.get() == "duration":
             self.time_to_run = int(self.minutes_var.get())
@@ -221,7 +241,10 @@ class MainWindow:
         self.after_actual_start_id = None
         self.write_log(f"polling vehicles for trip {self.trip_id} for {self.time_to_run} minutes")
         self.monitoring = True
+        # call stop_monitoring after time_to_run elapses
         self.after_stop_polling_id = self.root.after(self.time_to_run * 60 * 1000, self.stop_monitoring)
+        # first call to countdown which will call itself every second for polling_interval_var
+        # when timer reaches 0 it polls vehicles
         self.countdown(0)
 
     def stop_monitoring(self):
@@ -244,8 +267,13 @@ class MainWindow:
             self.after_actual_start_id = None
         self.start_monitoring_button.configure(state="!disabled")
         self.stop_monitoring_button.configure(state="disabled")
+        self.configured_trips.configure(state=NORMAL)
+        self.export_trip_button.configure(state="!disabled")
+        self.delete_trip_button.configure(state="!disabled")
         self.monitoring = False
         self.write_log("polling stopped")
+        # enable corresponding widgets under radio buttons
+        self.select_interval_type()
 
     def countdown(self, timer: int):
         """
@@ -289,31 +317,32 @@ class MainWindow:
         Enable/disable widgets based on selected radio button
         :return: None
         """
-        if self.interval_type_var.get() == "duration":
-            self.minutes_to_run_label.configure(state=NORMAL)
-            self.minutes_spin.configure(state=NORMAL)
-            self.start_time_label.configure(state=DISABLED)
-            self.start_hour_spin.configure(state=DISABLED)
-            self.start_minute_spin.configure(state=DISABLED)
-            self.end_time_label.configure(state=DISABLED)
-            self.end_hour_spin.configure(state=DISABLED)
-            self.end_minute_spin.configure(state=DISABLED)
-        else:
-            self.minutes_to_run_label.configure(state=DISABLED)
-            self.minutes_spin.configure(state=DISABLED)
-            self.start_time_label.configure(state=NORMAL)
-            self.start_hour_spin.configure(state=NORMAL)
-            self.start_minute_spin.configure(state=NORMAL)
-            self.end_time_label.configure(state=NORMAL)
-            self.end_hour_spin.configure(state=NORMAL)
-            self.end_minute_spin.configure(state=NORMAL)
+        if not self.monitoring:
+            if self.interval_type_var.get() == "duration":
+                self.minutes_to_run_label.configure(state=NORMAL)
+                self.minutes_spin.configure(state=NORMAL)
+                self.start_time_label.configure(state=DISABLED)
+                self.start_hour_spin.configure(state=DISABLED)
+                self.start_minute_spin.configure(state=DISABLED)
+                self.end_time_label.configure(state=DISABLED)
+                self.end_hour_spin.configure(state=DISABLED)
+                self.end_minute_spin.configure(state=DISABLED)
+            else:
+                self.minutes_to_run_label.configure(state=DISABLED)
+                self.minutes_spin.configure(state=DISABLED)
+                self.start_time_label.configure(state=NORMAL)
+                self.start_hour_spin.configure(state=NORMAL)
+                self.start_minute_spin.configure(state=NORMAL)
+                self.end_time_label.configure(state=NORMAL)
+                self.end_hour_spin.configure(state=NORMAL)
+                self.end_minute_spin.configure(state=NORMAL)
 
     def fill_configured_trips(self):
         """
         Populate configured_trips widget with the trips already stored in db
         :return: None
         """
-        configured_trips_list = get_monitored_trip(self.session)
+        configured_trips_list = get_monitored_trips(self.session)
         if configured_trips_list:
             self.trips_choices = []
             for t in configured_trips_list:
@@ -322,6 +351,22 @@ class MainWindow:
             self.trips_choices_var.set(self.trips_choices)
 
     def add_trip(self):
+        """
+        Open dedicated window to configure new trip in the db
+        :return: None
+        """
         self.configure_trip_button.configure(state=DISABLED)
         from interface_add_trip import AddTripWindow
         tw = AddTripWindow(self.root, self.session, self)
+
+    def export_trip(self):
+        self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
+        f = export_csv(self.session, self.trip_id)
+        if f:
+            messagebox.showinfo("CSV export", f"File saved\n{f}")
+
+    def delete_trip(self):
+
+        # refresh configured_trips after deletion
+        self.fill_configured_trips()
+        pass

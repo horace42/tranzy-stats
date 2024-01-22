@@ -62,9 +62,9 @@ class Position(Base):
 
     def __repr__(self):
         return f"Position(vehicle_no={self.vehicle_no}, " \
-               f"latitude={self.latitude}" \
-               f"longitude={self.longitude}" \
-               f"timestamp={self.timestamp}" \
+               f"latitude={self.latitude}, " \
+               f"longitude={self.longitude}, " \
+               f"timestamp={self.timestamp}, " \
                f"trip_idx={self.trip_idx})"
 
 

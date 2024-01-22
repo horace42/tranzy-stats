@@ -5,9 +5,11 @@ Functions for interaction with the database
 from sqlalchemy import select, and_
 from sqlalchemy.orm import Session
 
-from datetime import timedelta, timezone
+from datetime import timedelta, timezone, datetime
 
 from geopy import distance
+
+import csv
 
 from config import MAX_DIST_TO_STOP, TIME_TOLERANCE
 from tranzy_db import *
@@ -58,7 +60,7 @@ def get_route_stops(session: Session, stop_id_list):
     return result.scalars().all()
 
 
-def get_monitored_trip(session: Session):
+def get_monitored_trips(session: Session):
     """
     Retrieve trips configured for monitoring
     :param session:
@@ -137,6 +139,17 @@ def insert_position(session: Session, trip, vehicle, stops_object_list: list[Sto
             return f"{vehicle['label']} outside monitored segment", 2
     else:
         return f"{vehicle['label']} skipped - bad datetime: {dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')}", 2
+
+
+def export_csv(session: Session, trip_id):
+    stmt = select(Trip.idx, Trip.agency_id, Trip.trip_id, Trip.route_short_name, Trip.route_long_name, Trip.trip_headsign, Position.vehicle_no, Position.latitude, Position.longitude, Position.timestamp, Position.speed, Position.stop_distance, Stop.stop_name).join_from(Trip, Position).join_from(Position, Stop).where(Trip.trip_id == trip_id)
+    results = session.execute(stmt).all()
+    file_name = f"exports/tranzy_{trip_id}_{datetime.now().astimezone().strftime('%Y%m%d_%H%M%S')}.csv"
+    with open(file_name,"w", newline='', encoding="utf-8-sig") as f:
+        writer = csv.writer(f, delimiter=",", dialect="excel")
+        writer.writerow(results[0]._fields)
+        writer.writerows(results)
+    return file_name
 
 
 # TODO: results output - select distinct stops with smallest stop_distance from position?
