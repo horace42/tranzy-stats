@@ -23,9 +23,12 @@ class MainWindow:
         self.time_to_run = 5  # default time to run the polling (minutes)
         self.monitoring = False  # monitoring in progress
         self.trip_id = ""
+        self.trip_id_list = []  # to support multiple trips monitoring
         self.session = s
         self.trip = Trip()  # Trip objet to retrieve monitored trip details from db
+        self.trip_list = []  # to support multiple trips monitoring
         self.stops_object_list = []  # list of Stop objects to retrieve from db stops of monitored trip
+        self.stops_object_list_list = []  # to support multiple trips monitoring
 
         self.root = r
         self.root.minsize(width=1024, height=768)
@@ -58,7 +61,7 @@ class MainWindow:
         self.trips_choices = []
         self.trips_choices_var = StringVar(value=self.trips_choices)
         self.configured_trips = Listbox(left_frame, width=65, height=10, name="conf_trips",
-                                        selectmode=BROWSE, listvariable=self.trips_choices_var)
+                                        selectmode=EXTENDED, listvariable=self.trips_choices_var)
         self.configured_trips.grid(column=0, columnspan=4, row=1, rowspan=5)
         # when selection changes update the monitored_trip_label var
         self.configured_trips.bind('<<ListboxSelect>>', self.update_selected_trip)
@@ -186,12 +189,20 @@ class MainWindow:
                 self.start_monitoring_button.configure(state=NORMAL)
                 self.export_trip_button.configure(state=NORMAL)
                 self.delete_trip_button.configure(state=NORMAL)
+        elif len(idx_tuple) == 0 and self.root.focus_get().winfo_name() == "conf_trips":
+            self.monitored_trip_var.set(value="Choose a trip to monitor")
+            self.start_monitoring_button.configure(state=DISABLED)
+            self.export_trip_button.configure(state=DISABLED)
+            self.delete_trip_button.configure(state=DISABLED)
         else:
-            if self.root.focus_get().winfo_name() == "conf_trips":
-                self.monitored_trip_var.set(value="Choose a trip to monitor")
-                self.start_monitoring_button.configure(state=DISABLED)
-                self.export_trip_button.configure(state=DISABLED)
-                self.delete_trip_button.configure(state=DISABLED)
+            # multiple trips selected
+            t = "Multiple: "
+            for idx in idx_tuple:
+                t_id = self.trips_choices[idx].split("-")[0].replace(" ", "")
+                t += t_id
+                t += ", "
+            self.monitored_trip_var.set(value=t[0:-2])
+            pass
 
     def start_monitoring(self):
         """
@@ -204,8 +215,22 @@ class MainWindow:
         self.configure_trip_button.configure(state=DISABLED)
         self.export_trip_button.configure(state=DISABLED)
         self.delete_trip_button.configure(state=DISABLED)
-        self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
-        self.trip, self.stops_object_list = get_monitor_config(self.session, self.trip_id)
+        self.trip_id_list.clear()
+        self.trip_list.clear()
+        self.stops_object_list_list.clear()
+        if self.monitored_trip_var.get()[0:9] == "Multiple:":
+            self.trip_id_list = self.monitored_trip_var.get()[10:].split(", ")
+            print(self.trip_id_list)
+        else:
+            self.trip_id_list.append(self.monitored_trip_var.get().split("-")[0].replace(" ", ""))
+            print(self.trip_id_list)
+        # self.trip, self.stops_object_list = get_monitor_config(self.session, self.trip_id)
+        for t_id in self.trip_id_list:
+            temp_t, temp_stops_list = get_monitor_config(self.session, t_id)
+            self.trip_list.append(temp_t)
+            self.stops_object_list_list.append(temp_stops_list)
+        print(self.trip_list)
+        print(self.stops_object_list_list)
 
         # disable widgets under radio buttons
         self.minutes_to_run_label.configure(state=DISABLED)
@@ -298,13 +323,15 @@ class MainWindow:
             self.timer_var.set("--")
             self.timer_label.update()
             if self.monitoring:
-                vehicles = get_vehicles(self.trip_id)
+                vehicles = get_vehicles(self.trip_id_list)
                 if not vehicles or len(vehicles) == 0:
                     self.write_log("no vehicles on route", 2)
                 else:
                     for v in vehicles:
-                        msg, msg_type = insert_position(self.session, self.trip, v, self.stops_object_list)
-                        self.write_log(msg, msg_type)
+                        print(v)
+                        # TODO: map vehicles to correct trip
+                        # msg, msg_type = insert_position(self.session, self.trip, v, self.stops_object_list)
+                        # self.write_log(msg, msg_type)
                 self.countdown(int(self.polling_interval_var.get()))
 
     def write_log(self, message, msg_type=0):

@@ -80,7 +80,7 @@ def get_trips(route_id: int):
         return [t for t in response.json() if t["route_id"] == route_id]
 
 
-def get_vehicles(trip_id: str):
+def get_vehicles(trip_id: list[str]):
     """
     Get vehicles positions.
     :param trip_id: Trip ID obtain from get_trips return, used to filter output
@@ -100,7 +100,7 @@ def get_vehicles(trip_id: str):
     else:
         data = response.json()
         if type(data) == list and len(data) != 0 and type(data[0]) == dict and "trip_id" in data[0]:
-            return [v for v in response.json() if v["trip_id"] == trip_id]
+            return [v for v in response.json() if v["trip_id"] in trip_id]
         else:
             print(f"{datetime.now().astimezone().strftime('%H:%M:%S')} Invalid data for vehicles: {data}")
             return []
