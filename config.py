@@ -2,13 +2,16 @@
 Configuration of constants / defaults
 """
 
+import os
+
 # API key and endpoints
 # Get your API key here (use Edge if Chrome doesn't work):
 # https://tranzy.dev/accounts/my-apps
+# ********** EXPORT YOUR KEY AS ENVIRONMENT VARIABLE "TRANZY_KEY"
+
 # agency (token is created for a single agency)
 AGENCY_ID = "2"
-# TODO: remove key from config
-TRANZY_KEY = "YWTSVcSGyx2DNvX9zSO0o4qdcNwset6l8E9WDg0c"
+TRANZY_KEY = os.environ.get("TRANZY_KEY")
 TRANZY_URL = "https://api.tranzy.dev/v1/opendata/"
 
 AGENCY = "agency"
