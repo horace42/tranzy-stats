@@ -10,8 +10,8 @@ from datetime import datetime, timedelta, time
 from sqlalchemy.orm import Session
 
 from config import POLLING_INTERVAL, TIME_TO_RUN, AGENCY_ID
-from tranzy_db import Trip, Stop
-from tranzy_db_tools import get_monitored_trips, get_monitor_config, insert_position, export_csv
+from tranzy_db import Trip
+from tranzy_db_tools import get_monitored_trips, get_monitor_config, insert_position, export_csv, delete_trip_data
 from tranzy_req import get_agency_name, get_vehicles
 
 
@@ -24,8 +24,8 @@ class MainWindow:
         self.monitoring = False  # monitoring in progress
         self.trip_id = ""
         self.session = s
-        self.trip: Trip  # Trip objet to retrieve monitored trip details from db
-        self.stops_object_list: list[Stop]  # list of Stop objects to retrieve from db stops of monitored trip
+        self.trip = Trip()  # Trip objet to retrieve monitored trip details from db
+        self.stops_object_list = []  # list of Stop objects to retrieve from db stops of monitored trip
 
         self.root = r
         self.root.minsize(width=1024, height=768)
@@ -57,7 +57,7 @@ class MainWindow:
 
         self.trips_choices = []
         self.trips_choices_var = StringVar(value=self.trips_choices)
-        self.configured_trips = Listbox(left_frame, width=65, height=10,
+        self.configured_trips = Listbox(left_frame, width=65, height=10, name="conf_trips",
                                         selectmode=BROWSE, listvariable=self.trips_choices_var)
         self.configured_trips.grid(column=0, columnspan=4, row=1, rowspan=5)
         # when selection changes update the monitored_trip_label var
@@ -67,11 +67,11 @@ class MainWindow:
         self.configure_trip_button.grid(column=0, columnspan=2, row=6)
 
         self.export_trip_button = ttk.Button(left_frame, width=10, text="Export",
-                                             command=self.export_trip, state="disabled")
+                                             command=self.export_trip, state=DISABLED)
         self.export_trip_button.grid(column=2, row=6)
 
         self.delete_trip_button = ttk.Button(left_frame, width=10, text="Delete",
-                                             command=self.delete_trip, state="disabled")
+                                             command=self.delete_trip, state=DISABLED)
         self.delete_trip_button.grid(column=3, row=6)
 
         self.interval_type_var = StringVar(value="duration")
@@ -127,12 +127,12 @@ class MainWindow:
 
         self.start_monitoring_button = ttk.Button(left_frame, width=30, text="Start monitoring",
                                                   command=self.start_monitoring)
-        self.start_monitoring_button.state(["disabled"])
+        self.start_monitoring_button.configure(state=DISABLED)
         self.start_monitoring_button.grid(column=0, columnspan=4, row=10)
 
         self.stop_monitoring_button = ttk.Button(left_frame, width=30, text="Stop monitoring",
                                                  command=self.stop_monitoring)
-        self.stop_monitoring_button.state(["disabled"])
+        self.stop_monitoring_button.configure(state=DISABLED)
         self.stop_monitoring_button.grid(column=0, columnspan=4, row=11)
 
         for child in left_frame.winfo_children():
@@ -170,6 +170,7 @@ class MainWindow:
         # init widgets
         self.agency_name_var.set(get_agency_name(AGENCY_ID))
         self.fill_configured_trips()
+        self.configured_trips.focus()
 
     def update_selected_trip(self, event):
         """
@@ -182,20 +183,27 @@ class MainWindow:
             idx = int(idx_tuple[0])
             self.monitored_trip_var.set(value=self.trips_choices[idx])
             if not self.monitoring:
-                self.start_monitoring_button.configure(state="!disabled")
-                self.export_trip_button.configure(state="!disabled")
-                self.delete_trip_button.configure(state="!disabled")
+                self.start_monitoring_button.configure(state=NORMAL)
+                self.export_trip_button.configure(state=NORMAL)
+                self.delete_trip_button.configure(state=NORMAL)
+        else:
+            if self.root.focus_get().winfo_name() == "conf_trips":
+                self.monitored_trip_var.set(value="Choose a trip to monitor")
+                self.start_monitoring_button.configure(state=DISABLED)
+                self.export_trip_button.configure(state=DISABLED)
+                self.delete_trip_button.configure(state=DISABLED)
 
     def start_monitoring(self):
         """
         Start monitoring when start_monitoring_button is pressed
         :return: None
         """
-        self.start_monitoring_button.configure(state="disabled")
-        self.stop_monitoring_button.configure(state="!disabled")
+        self.start_monitoring_button.configure(state=DISABLED)
+        self.stop_monitoring_button.configure(state=NORMAL)
         self.configured_trips.configure(state=DISABLED)
-        self.export_trip_button.configure(state="disabled")
-        self.delete_trip_button.configure(state="disabled")
+        self.configure_trip_button.configure(state=DISABLED)
+        self.export_trip_button.configure(state=DISABLED)
+        self.delete_trip_button.configure(state=DISABLED)
         self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
         self.trip, self.stops_object_list = get_monitor_config(self.session, self.trip_id)
 
@@ -265,11 +273,12 @@ class MainWindow:
         if self.after_actual_start_id:
             self.root.after_cancel(self.after_actual_start_id)
             self.after_actual_start_id = None
-        self.start_monitoring_button.configure(state="!disabled")
-        self.stop_monitoring_button.configure(state="disabled")
+        self.start_monitoring_button.configure(state=NORMAL)
+        self.stop_monitoring_button.configure(state=DISABLED)
         self.configured_trips.configure(state=NORMAL)
-        self.export_trip_button.configure(state="!disabled")
-        self.delete_trip_button.configure(state="!disabled")
+        self.configure_trip_button.configure(state=NORMAL)
+        self.export_trip_button.configure(state=NORMAL)
+        self.delete_trip_button.configure(state=NORMAL)
         self.monitoring = False
         self.write_log("polling stopped")
         # enable corresponding widgets under radio buttons
@@ -310,7 +319,7 @@ class MainWindow:
         self.monitor_log.insert(END, f"{datetime.now().astimezone().strftime('%H:%M:%S')} - {message}\n",
                                 (tags[msg_type]))
         self.monitor_log.see(END)
-        self.monitor_log["state"] = "disabled"
+        self.monitor_log["state"] = DISABLED
 
     def select_interval_type(self):
         """
@@ -356,17 +365,42 @@ class MainWindow:
         :return: None
         """
         self.configure_trip_button.configure(state=DISABLED)
+        self.configured_trips.configure(state=DISABLED)
+        self.export_trip_button.configure(state=DISABLED)
+        self.delete_trip_button.configure(state=DISABLED)
         from interface_add_trip import AddTripWindow
         tw = AddTripWindow(self.root, self.session, self)
 
     def export_trip(self):
+        """
+        Export statistics of selected trip to csv
+        :return: File name
+        """
         self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
         f = export_csv(self.session, self.trip_id)
         if f:
             messagebox.showinfo("CSV export", f"File saved\n{f}")
+        else:
+            messagebox.showerror("CSV export", "No data to export!")
 
     def delete_trip(self):
-
-        # refresh configured_trips after deletion
-        self.fill_configured_trips()
-        pass
+        """
+        Delete all data for selected trip
+        :return:
+        """
+        self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
+        answer = messagebox.askyesnocancel("Delete trip & collected data",
+                                           f"Trip configuration for {self.trip_id} and collected data will be deleted."
+                                           f"\nDo you want to export the statistics to a csv file?")
+        if answer is None:
+            pass
+        else:
+            if answer:
+                self.export_trip()
+            delete_trip_data(self.session, self.trip_id)
+            messagebox.showinfo("Delete", f"Trip {self.trip_id} and stats deleted!")
+            # refresh configured_trips after deletion
+            self.fill_configured_trips()
+            self.configured_trips.selection_clear(0, self.configured_trips.index("end"))
+            self.configured_trips.focus()
+            self.update_selected_trip(None)

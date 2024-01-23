@@ -2,10 +2,10 @@
 Functions for interaction with the database
 """
 
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import Session
 
-from datetime import timedelta, timezone, datetime
+from datetime import timedelta, timezone
 
 from geopy import distance
 
@@ -142,6 +142,13 @@ def insert_position(session: Session, trip, vehicle, stops_object_list: list[Sto
 
 
 def export_csv(session: Session, trip_id):
+    """
+    Export trip statistics to csv
+    :param session: Session
+    :param trip_id: Trip id
+    :return: File name
+    """
+    # select statement
     stmt = select(Trip.idx, Trip.agency_id, Trip.trip_id,
                   Trip.route_short_name, Trip.route_long_name, Trip.trip_headsign,
                   Position.vehicle_no, Position.latitude, Position.longitude,
@@ -150,13 +157,43 @@ def export_csv(session: Session, trip_id):
         .join_from(Trip, Position)\
         .join_from(Position, Stop)\
         .where(Trip.trip_id == trip_id)
+    # get data as list of Result objects (named tuple)
     results = session.execute(stmt).all()
-    file_name = f"exports/tranzy_{trip_id}_{datetime.now().astimezone().strftime('%Y%m%d_%H%M%S')}.csv"
-    with open(file_name,"w", newline='', encoding=CSV_ENC) as f:
-        writer = csv.writer(f, delimiter=",", dialect="excel")
-        writer.writerow(results[0]._fields)
-        writer.writerows(results)
-    return file_name
+    if results:
+        file_name = f"exports/tranzy_{results[0].route_short_name}_{trip_id}" \
+                    f"_{datetime.now().astimezone().strftime('%Y%m%d_%H%M%S')}.csv"
+        with open(file_name, "w", newline='', encoding=CSV_ENC) as f:
+            writer = csv.writer(f, delimiter=",", dialect="excel")
+            writer.writerow(results[0]._fields)
+            writer.writerows(results)
+        return file_name
+    else:
+        return None
+
+
+def delete_trip_data(session: Session, trip_id):
+    """
+    Delete all trip data
+    :param session: Session
+    :param trip_id: Trip id
+    :return: None
+    """
+    stmt = select(Trip.idx).where(Trip.trip_id == trip_id)
+    trip_idx = session.execute(stmt).first()[0]
+    if trip_idx:
+        trip_idx = int(trip_idx)
+        # delete statements
+        del_monitored_stops_stmt = delete(MonitoredStops).where(MonitoredStops.trip_idx == trip_idx)
+        del_stop_order_stmt = delete(StopOrder).where(StopOrder.trip_idx == trip_idx)
+        del_position_stmt = delete(Position).where(Position.trip_idx == trip_idx)
+        del_trip_stmt = delete(Trip).where(Trip.idx == trip_idx)
+        session.execute(del_monitored_stops_stmt)
+        session.execute(del_stop_order_stmt)
+        session.execute(del_position_stmt)
+        session.execute(del_trip_stmt)
+        session.commit()
+    else:
+        print("Something went wrong...")
 
 
 # TODO: results output - select distinct stops with smallest stop_distance from position?

@@ -7,6 +7,7 @@ Configuration of constants / defaults
 # https://tranzy.dev/accounts/my-apps
 # agency (token is created for a single agency)
 AGENCY_ID = "2"
+# TODO: remove key from config
 TRANZY_KEY = "YWTSVcSGyx2DNvX9zSO0o4qdcNwset6l8E9WDg0c"
 TRANZY_URL = "https://api.tranzy.dev/v1/opendata/"
 

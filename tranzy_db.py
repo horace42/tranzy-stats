@@ -55,7 +55,6 @@ class Position(Base):
     stop_distance: Mapped[int] = mapped_column(Integer)
     trip_idx = mapped_column(ForeignKey("trip.idx"))  # PK in trip table (not tranzy trip_id)
     stop_idx = mapped_column(ForeignKey("stop.idx"))
-    # TODO: add distance to the closest stop and relationship to respective stop
 
     trip: Mapped["Trip"] = relationship(back_populates="positions")
     closest_stop: Mapped["Stop"] = relationship(back_populates="positions")

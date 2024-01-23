@@ -5,6 +5,7 @@ Interface to add new trip to be monitored
 from tkinter import *
 from tkinter import ttk, messagebox
 
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
 from config import AGENCY_ID
@@ -19,9 +20,11 @@ class AddTripWindow:
         self.root = r
         self.session = s
         self.main_window = w
-        self.trip: Trip
+        self.trip = Trip()
         self.start_stop = 0  # stop order to start logging from
         self.end_stop = 0  # stop order to end monitoring
+        self.stops_order_object_list = []
+        self.route_trips = []
 
         self.add_trip_window = Toplevel(self.root)
         self.add_trip_window.title("Add trip")
@@ -203,12 +206,13 @@ class AddTripWindow:
         :param event: Bind event
         :return: None
         """
-        self.add_trip_button.configure(state=NORMAL)
         idx_tuple = self.stops_list.curselection()
         if len(idx_tuple) > 1:
+            self.add_trip_button.configure(state=NORMAL)
             self.start_stop = min(idx_tuple)
             self.end_stop = max(idx_tuple)
         else:
+            self.add_trip_button.configure(state=DISABLED)
             self.start_stop = 0
             self.end_stop = 0
 
@@ -217,8 +221,22 @@ class AddTripWindow:
         On exit enable configure_trip_button and refresh configured_trips
         :return: None
         """
+        # expunge objects
+        if inspect(self.trip).has_identity:
+            self.session.expunge(self.trip)
+        if self.stops_order_object_list:
+            for item in self.stops_order_object_list:
+                self.session.expunge(item)
+        # enable buttons from main window
         self.main_window.configure_trip_button.configure(state=NORMAL)
+        self.main_window.configured_trips.configure(state=NORMAL)
+        self.main_window.export_trip_button.configure(state=NORMAL)
+        self.main_window.delete_trip_button.configure(state=NORMAL)
+        # refresh configured_trips
         self.main_window.fill_configured_trips()
+        self.main_window.configured_trips.selection_clear(0, self.main_window.configured_trips.index("end"))
+        self.main_window.configured_trips.focus()
+        self.main_window.update_selected_trip(None)
         self.add_trip_window.destroy()
 
     def cr_pressed(self, event):
