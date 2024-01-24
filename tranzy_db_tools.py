@@ -133,12 +133,12 @@ def insert_position(session: Session, trip, vehicle, stops_object_list: list[Sto
             )
             session.add(new_position)
             session.commit()
-            return f"{vehicle['label']}, {dt.astimezone().strftime('%H:%M:%S')}, " \
+            return f"{vehicle['trip_id']}-{vehicle['label']}, {dt.astimezone().strftime('%H:%M:%S')}, " \
                    f"{closest_stop.stop_name} at {min_distance} meters", 1
         else:
-            return f"{vehicle['label']} outside monitored segment", 2
+            return f"{vehicle['trip_id']}-{vehicle['label']} outside monitored segment", 2
     else:
-        return f"{vehicle['label']} skipped - bad datetime: {dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')}", 2
+        return f"{vehicle['trip_id']}-{vehicle['label']} skipped - bad datetime: {dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')}", 2
 
 
 def export_csv(session: Session, trip_id):

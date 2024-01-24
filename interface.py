@@ -22,7 +22,7 @@ class MainWindow:
         self.after_actual_start_id = None  # id to cancel scheduling of deferred start
         self.time_to_run = 5  # default time to run the polling (minutes)
         self.monitoring = False  # monitoring in progress
-        self.trip_id = ""
+        self.trip_id = ""  # TODO: adapt all usage of self.trip_id to multiple trips monitoring
         self.trip_id_list = []  # to support multiple trips monitoring
         self.session = s
         self.trip = Trip()  # Trip objet to retrieve monitored trip details from db
@@ -76,6 +76,8 @@ class MainWindow:
         self.delete_trip_button = ttk.Button(left_frame, width=10, text="Delete",
                                              command=self.delete_trip, state=DISABLED)
         self.delete_trip_button.grid(column=3, row=6)
+
+        # TODO: new button and interface to see/modify monitored stops
 
         self.interval_type_var = StringVar(value="duration")
         duration_radio = ttk.Radiobutton(left_frame, text="Duration", width=15,
@@ -147,7 +149,7 @@ class MainWindow:
 
         log_frame = ttk.Frame(right_frame, width=64, height=20)
         log_frame.grid(column=0, columnspan=2, row=1)
-        self.monitor_log = Text(log_frame, width=62, height=20, state=DISABLED, wrap=WORD,
+        self.monitor_log = Text(log_frame, width=62, height=20, state=DISABLED, wrap=NONE,
                                 background="white", padx=10, pady=10)
         self.monitor_log.grid(column=0, row=0, sticky="NWES")
 
@@ -156,9 +158,13 @@ class MainWindow:
         self.monitor_log.tag_configure("logged_position", foreground="green")
         self.monitor_log.tag_configure("skipped_position", foreground="gray")
 
-        self.log_scroll = ttk.Scrollbar(log_frame, orient=VERTICAL, command=self.monitor_log.yview)
-        self.log_scroll.grid(column=1, row=0, sticky="NS")
-        self.monitor_log.configure(yscrollcommand=self.log_scroll.set)
+        self.log_scroll_y = ttk.Scrollbar(log_frame, orient=VERTICAL, command=self.monitor_log.yview)
+        self.log_scroll_y.grid(column=1, row=0, sticky="NS")
+        self.monitor_log.configure(yscrollcommand=self.log_scroll_y.set)
+
+        self.log_scroll_x = ttk.Scrollbar(log_frame, orient=HORIZONTAL, command=self.monitor_log.xview)
+        self.log_scroll_x.grid(column=0, row=1, sticky="WE")
+        self.monitor_log.configure(xscrollcommand=self.log_scroll_x.set)
 
         next_poll_label = ttk.Label(right_frame, text="Next poll in (s):", width=30)
         next_poll_label.grid(column=0, row=2)
@@ -272,7 +278,7 @@ class MainWindow:
         :return: None
         """
         self.after_actual_start_id = None
-        self.write_log(f"polling vehicles for trip {self.trip_id} for {self.time_to_run} minutes")
+        self.write_log(f"polling vehicles for trip {', '.join(self.trip_id_list)} for {self.time_to_run} minutes")
         self.monitoring = True
         # call stop_monitoring after time_to_run elapses
         self.after_stop_polling_id = self.root.after(self.time_to_run * 60 * 1000, self.stop_monitoring)
@@ -328,10 +334,11 @@ class MainWindow:
                     self.write_log("no vehicles on route", 2)
                 else:
                     for v in vehicles:
-                        print(v)
-                        # TODO: map vehicles to correct trip
-                        # msg, msg_type = insert_position(self.session, self.trip, v, self.stops_object_list)
-                        # self.write_log(msg, msg_type)
+                        # for each vehicle find the objects list index to send correct parameters to insert_position
+                        list_index = next(self.trip_list.index(item) for item in self.trip_list if item.trip_id == v["trip_id"])
+                        msg, msg_type = insert_position(self.session, self.trip_list[list_index], v,
+                                                        self.stops_object_list_list[list_index])
+                        self.write_log(msg, msg_type)
                 self.countdown(int(self.polling_interval_var.get()))
 
     def write_log(self, message, msg_type=0):
