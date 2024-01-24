@@ -10,7 +10,6 @@ from datetime import datetime, timedelta, time
 from sqlalchemy.orm import Session
 
 from config import POLLING_INTERVAL, TIME_TO_RUN, AGENCY_ID
-from tranzy_db import Trip
 from tranzy_db_tools import get_monitored_trips, get_monitor_config, insert_position, export_csv, delete_trip_data
 from tranzy_req import get_agency_name, get_vehicles
 
@@ -22,12 +21,9 @@ class MainWindow:
         self.after_actual_start_id = None  # id to cancel scheduling of deferred start
         self.time_to_run = 5  # default time to run the polling (minutes)
         self.monitoring = False  # monitoring in progress
-        self.trip_id = ""  # TODO: adapt all usage of self.trip_id to multiple trips monitoring
         self.trip_id_list = []  # to support multiple trips monitoring
         self.session = s
-        self.trip = Trip()  # Trip objet to retrieve monitored trip details from db
         self.trip_list = []  # to support multiple trips monitoring
-        self.stops_object_list = []  # list of Stop objects to retrieve from db stops of monitored trip
         self.stops_object_list_list = []  # to support multiple trips monitoring
 
         self.root = r
@@ -78,6 +74,7 @@ class MainWindow:
         self.delete_trip_button.grid(column=3, row=6)
 
         # TODO: new button and interface to see/modify monitored stops
+        # TODO: results output (new window?) - select distinct stops with smallest stop_distance from position?
 
         self.interval_type_var = StringVar(value="duration")
         duration_radio = ttk.Radiobutton(left_frame, text="Duration", width=15,
@@ -221,16 +218,9 @@ class MainWindow:
         self.configure_trip_button.configure(state=DISABLED)
         self.export_trip_button.configure(state=DISABLED)
         self.delete_trip_button.configure(state=DISABLED)
-        self.trip_id_list.clear()
         self.trip_list.clear()
         self.stops_object_list_list.clear()
-        if self.monitored_trip_var.get()[0:9] == "Multiple:":
-            self.trip_id_list = self.monitored_trip_var.get()[10:].split(", ")
-            print(self.trip_id_list)
-        else:
-            self.trip_id_list.append(self.monitored_trip_var.get().split("-")[0].replace(" ", ""))
-            print(self.trip_id_list)
-        # self.trip, self.stops_object_list = get_monitor_config(self.session, self.trip_id)
+        self.set_trip_id_list()
         for t_id in self.trip_id_list:
             temp_t, temp_stops_list = get_monitor_config(self.session, t_id)
             self.trip_list.append(temp_t)
@@ -335,7 +325,8 @@ class MainWindow:
                 else:
                     for v in vehicles:
                         # for each vehicle find the objects list index to send correct parameters to insert_position
-                        list_index = next(self.trip_list.index(item) for item in self.trip_list if item.trip_id == v["trip_id"])
+                        list_index = next(self.trip_list.index(item)
+                                          for item in self.trip_list if item.trip_id == v["trip_id"])
                         msg, msg_type = insert_position(self.session, self.trip_list[list_index], v,
                                                         self.stops_object_list_list[list_index])
                         self.write_log(msg, msg_type)
@@ -410,31 +401,50 @@ class MainWindow:
         Export statistics of selected trip to csv
         :return: File name
         """
-        self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
-        f = export_csv(self.session, self.trip_id)
-        if f:
-            messagebox.showinfo("CSV export", f"File saved\n{f}")
+        self.set_trip_id_list()
+        if len(self.trip_id_list) == 1:
+            f = export_csv(self.session, self.trip_id_list[0])
+            if f:
+                messagebox.showinfo("CSV export", f"File saved\n{f}")
+            else:
+                messagebox.showerror("CSV export", "No data to export!")
         else:
-            messagebox.showerror("CSV export", "No data to export!")
+            messagebox.showerror("CSV export", "Select a single trip for this operation!")
 
     def delete_trip(self):
         """
         Delete all data for selected trip
         :return:
         """
-        self.trip_id = self.monitored_trip_var.get().split("-")[0].replace(" ", "")
-        answer = messagebox.askyesnocancel("Delete trip & collected data",
-                                           f"Trip configuration for {self.trip_id} and collected data will be deleted."
-                                           f"\nDo you want to export the statistics to a csv file?")
-        if answer is None:
-            pass
+        self.set_trip_id_list()
+        if len(self.trip_id_list) == 1:
+            answer = messagebox.askyesnocancel("Delete trip & collected data",
+                                               f"Trip configuration for {self.trip_id_list[0]} and collected data "
+                                               f"will be deleted.\nDo you want to export the statistics to a csv file?")
+            if answer is None:
+                pass
+            else:
+                if answer:
+                    self.export_trip()
+                delete_trip_data(self.session, self.trip_id_list[0])
+                messagebox.showinfo("Delete trip", f"Trip {self.trip_id_list[0]} and stats deleted!")
+                # refresh configured_trips after deletion
+                self.fill_configured_trips()
+                self.configured_trips.selection_clear(0, self.configured_trips.index("end"))
+                self.configured_trips.focus()
+                self.update_selected_trip(None)
         else:
-            if answer:
-                self.export_trip()
-            delete_trip_data(self.session, self.trip_id)
-            messagebox.showinfo("Delete", f"Trip {self.trip_id} and stats deleted!")
-            # refresh configured_trips after deletion
-            self.fill_configured_trips()
-            self.configured_trips.selection_clear(0, self.configured_trips.index("end"))
-            self.configured_trips.focus()
-            self.update_selected_trip(None)
+            messagebox.showerror("Delete trip", "Select a single trip for this operation!")
+
+    def set_trip_id_list(self):
+        """
+        Populate trip_id_list based on content of monitored_trip_var
+        :return: None
+        """
+        self.trip_id_list.clear()
+        if self.monitored_trip_var.get()[0:9] == "Multiple:":
+            # multiple trips selected > multiple items
+            self.trip_id_list = self.monitored_trip_var.get()[10:].split(", ")
+        else:
+            # single trip selected > 1 item
+            self.trip_id_list.append(self.monitored_trip_var.get().split("-")[0].replace(" ", ""))

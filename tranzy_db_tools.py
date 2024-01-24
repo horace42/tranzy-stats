@@ -138,7 +138,8 @@ def insert_position(session: Session, trip, vehicle, stops_object_list: list[Sto
         else:
             return f"{vehicle['trip_id']}-{vehicle['label']} outside monitored segment", 2
     else:
-        return f"{vehicle['trip_id']}-{vehicle['label']} skipped - bad datetime: {dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')}", 2
+        return f"{vehicle['trip_id']}-{vehicle['label']} skipped - bad datetime: " \
+               f"{dt.astimezone().strftime('%Y-%m-%d %H:%M:%S')}", 2
 
 
 def export_csv(session: Session, trip_id):
@@ -194,6 +195,3 @@ def delete_trip_data(session: Session, trip_id):
         session.commit()
     else:
         print("Something went wrong...")
-
-
-# TODO: results output - select distinct stops with smallest stop_distance from position?
