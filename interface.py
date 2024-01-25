@@ -192,12 +192,7 @@ class MainWindow:
                 self.start_monitoring_button.configure(state=NORMAL)
                 self.export_trip_button.configure(state=NORMAL)
                 self.delete_trip_button.configure(state=NORMAL)
-        elif len(idx_tuple) == 0 and self.root.focus_get().winfo_name() == "conf_trips":
-            self.monitored_trip_var.set(value="Choose a trip to monitor")
-            self.start_monitoring_button.configure(state=DISABLED)
-            self.export_trip_button.configure(state=DISABLED)
-            self.delete_trip_button.configure(state=DISABLED)
-        else:
+        elif len(idx_tuple) > 1:
             # multiple trips selected
             t = "Multiple: "
             for idx in idx_tuple:
@@ -205,7 +200,6 @@ class MainWindow:
                 t += t_id
                 t += ", "
             self.monitored_trip_var.set(value=t[0:-2])
-            pass
 
     def start_monitoring(self):
         """
@@ -225,8 +219,6 @@ class MainWindow:
             temp_t, temp_stops_list = get_monitor_config(self.session, t_id)
             self.trip_list.append(temp_t)
             self.stops_object_list_list.append(temp_stops_list)
-        print(self.trip_list)
-        print(self.stops_object_list_list)
 
         # disable widgets under radio buttons
         self.minutes_to_run_label.configure(state=DISABLED)
@@ -304,6 +296,7 @@ class MainWindow:
         self.write_log("polling stopped")
         # enable corresponding widgets under radio buttons
         self.select_interval_type()
+        self.deselect_config_trips()
 
     def countdown(self, timer: int):
         """
@@ -429,10 +422,7 @@ class MainWindow:
                 delete_trip_data(self.session, self.trip_id_list[0])
                 messagebox.showinfo("Delete trip", f"Trip {self.trip_id_list[0]} and stats deleted!")
                 # refresh configured_trips after deletion
-                self.fill_configured_trips()
-                self.configured_trips.selection_clear(0, self.configured_trips.index("end"))
-                self.configured_trips.focus()
-                self.update_selected_trip(None)
+                self.deselect_config_trips()
         else:
             messagebox.showerror("Delete trip", "Select a single trip for this operation!")
 
@@ -448,3 +438,9 @@ class MainWindow:
         else:
             # single trip selected > 1 item
             self.trip_id_list.append(self.monitored_trip_var.get().split("-")[0].replace(" ", ""))
+
+    def deselect_config_trips(self):
+        self.fill_configured_trips()
+        self.configured_trips.selection_clear(0, self.configured_trips.index("end"))
+        self.configured_trips.focus()
+        self.monitored_trip_var.set(value="Choose a trip to monitor")

@@ -233,10 +233,7 @@ class AddTripWindow:
         self.main_window.export_trip_button.configure(state=NORMAL)
         self.main_window.delete_trip_button.configure(state=NORMAL)
         # refresh configured_trips
-        self.main_window.fill_configured_trips()
-        self.main_window.configured_trips.selection_clear(0, self.main_window.configured_trips.index("end"))
-        self.main_window.configured_trips.focus()
-        self.main_window.update_selected_trip(None)
+        self.main_window.deselect_config_trips()
         self.add_trip_window.destroy()
 
     def cr_pressed(self, event):
