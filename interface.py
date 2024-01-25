@@ -440,7 +440,13 @@ class MainWindow:
             self.trip_id_list.append(self.monitored_trip_var.get().split("-")[0].replace(" ", ""))
 
     def deselect_config_trips(self):
+        """
+        Refresh configured_trips and clear selection.
+        :return: None
+        """
         self.fill_configured_trips()
         self.configured_trips.selection_clear(0, self.configured_trips.index("end"))
         self.configured_trips.focus()
+        self.export_trip_button.configure(state=DISABLED)
+        self.delete_trip_button.configure(state=DISABLED)
         self.monitored_trip_var.set(value="Choose a trip to monitor")
