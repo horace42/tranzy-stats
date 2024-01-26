@@ -230,6 +230,7 @@ class AddTripWindow:
         # enable buttons from main window
         self.main_window.configure_trip_button.configure(state=NORMAL)
         self.main_window.configured_trips.configure(state=NORMAL)
+        self.main_window.modify_trip_button.configure(state=NORMAL)
         # refresh configured_trips
         self.main_window.deselect_config_trips()
         self.add_trip_window.destroy()

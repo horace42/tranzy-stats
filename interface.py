@@ -62,8 +62,12 @@ class MainWindow:
         # when selection changes update the monitored_trip_label var
         self.configured_trips.bind('<<ListboxSelect>>', self.update_selected_trip)
 
-        self.configure_trip_button = ttk.Button(left_frame, width=20, text="Configure new trip", command=self.add_trip)
-        self.configure_trip_button.grid(column=0, columnspan=2, row=6)
+        self.configure_trip_button = ttk.Button(left_frame, width=10, text="Configure new trip", command=self.add_trip)
+        self.configure_trip_button.grid(column=0, row=6)
+
+        self.modify_trip_button = ttk.Button(left_frame, width=10, text="Modify trip",
+                                             command=self.mod_trip, state=DISABLED)
+        self.modify_trip_button.grid(column=1, row=6)
 
         self.export_trip_button = ttk.Button(left_frame, width=10, text="Export",
                                              command=self.export_trip, state=DISABLED)
@@ -73,7 +77,7 @@ class MainWindow:
                                              command=self.delete_trip, state=DISABLED)
         self.delete_trip_button.grid(column=3, row=6)
 
-        # TODO: new button and interface to see/modify monitored stops
+        # TODO: new button and interface to see/modify monitored stops - add functionality
         # TODO: results output (new window?) - select distinct stops with smallest stop_distance from position?
 
         self.interval_type_var = StringVar(value="duration")
@@ -190,6 +194,7 @@ class MainWindow:
             self.monitored_trip_var.set(value=self.trips_choices[idx])
             if not self.monitoring:
                 self.start_monitoring_button.configure(state=NORMAL)
+                self.modify_trip_button.configure(state=NORMAL)
                 self.export_trip_button.configure(state=NORMAL)
                 self.delete_trip_button.configure(state=NORMAL)
         elif len(idx_tuple) > 1:
@@ -290,6 +295,7 @@ class MainWindow:
         self.stop_monitoring_button.configure(state=DISABLED)
         self.configured_trips.configure(state=NORMAL)
         self.configure_trip_button.configure(state=NORMAL)
+        self.modify_trip_button.configure(state=NORMAL)
         self.export_trip_button.configure(state=NORMAL)
         self.delete_trip_button.configure(state=NORMAL)
         self.monitoring = False
@@ -384,6 +390,7 @@ class MainWindow:
         """
         self.configure_trip_button.configure(state=DISABLED)
         self.configured_trips.configure(state=DISABLED)
+        self.modify_trip_button.configure(state=DISABLED)
         self.export_trip_button.configure(state=DISABLED)
         self.delete_trip_button.configure(state=DISABLED)
         from interface_add_trip import AddTripWindow
@@ -447,6 +454,22 @@ class MainWindow:
         self.fill_configured_trips()
         self.configured_trips.selection_clear(0, self.configured_trips.index("end"))
         self.configured_trips.focus()
+        self.modify_trip_button.configure(state=DISABLED)
         self.export_trip_button.configure(state=DISABLED)
         self.delete_trip_button.configure(state=DISABLED)
         self.monitored_trip_var.set(value="Choose a trip to monitor")
+
+    def mod_trip(self):
+        self.set_trip_id_list()
+        if len(self.trip_id_list) == 1:
+            self.configure_trip_button.configure(state=DISABLED)
+            self.configured_trips.configure(state=DISABLED)
+            self.modify_trip_button.configure(state=DISABLED)
+            self.export_trip_button.configure(state=DISABLED)
+            self.delete_trip_button.configure(state=DISABLED)
+            from interface_monitored_stops import MonitoredStopsWindow
+            mw = MonitoredStopsWindow(self.root, self.session, self)
+        else:
+            messagebox.showerror("Modify trip", "Select a single trip for this operation!")
+
+# TODO: define execution states and map button states (which button should be active in an execution state)
