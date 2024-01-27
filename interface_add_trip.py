@@ -180,25 +180,21 @@ class AddTripWindow:
     def commit_trip(self):
         """
         Create MonitoredStops from stops_list selection. Commit all new objects to db. Command for add_trip_button.
-        :return:
+        :return: None
         """
-        if self.start_stop == self.end_stop:
-            # only one item selected
-            messagebox.showerror("Error", "Select multiple stops", parent=self.add_trip_window)
-        else:
-            # create object for monitored stops
-            m = MonitoredStops(
-                start_stop=self.start_stop,
-                end_stop=self.end_stop,
-                trip=self.trip
-            )
-            # commit objects to db
-            self.session.add(self.trip)
-            self.session.add_all(self.stops_order_object_list)
-            self.session.add(m)
-            self.session.commit()
-            messagebox.showinfo("Information", "Trip added to database", parent=self.add_trip_window)
-            self.window_close()
+        # create object for monitored stops
+        m = MonitoredStops(
+            start_stop=self.start_stop,
+            end_stop=self.end_stop,
+            trip=self.trip
+        )
+        # commit objects to db
+        self.session.add(self.trip)
+        self.session.add_all(self.stops_order_object_list)
+        self.session.add(m)
+        self.session.commit()
+        messagebox.showinfo("Information", "Trip added to database", parent=self.add_trip_window)
+        self.window_close()
 
     def stops_selected(self, event):
         """
@@ -218,7 +214,7 @@ class AddTripWindow:
 
     def window_close(self):
         """
-        On exit enable configure_trip_button and refresh configured_trips
+        On exit main window widgets states and refresh configured_trips
         :return: None
         """
         # expunge objects
@@ -226,11 +222,10 @@ class AddTripWindow:
             self.session.expunge(self.trip)
         if self.stops_order_object_list:
             for item in self.stops_order_object_list:
-                self.session.expunge(item)
-        # enable buttons from main window
-        self.main_window.configure_trip_button.configure(state=NORMAL)
-        self.main_window.configured_trips.configure(state=NORMAL)
-        self.main_window.modify_trip_button.configure(state=NORMAL)
+                if inspect(item).has_identity:
+                    self.session.expunge(item)
+        # enable widgets from main window
+        self.main_window.set_widget_state("idle_no_trip")
         # refresh configured_trips
         self.main_window.deselect_config_trips()
         self.add_trip_window.destroy()

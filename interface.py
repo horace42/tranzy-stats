@@ -105,7 +105,7 @@ class MainWindow:
         # when selection changes update the monitored_trip_label var
         self.configured_trips.bind('<<ListboxSelect>>', self.update_selected_trip)
 
-        self.configure_trip_button = ttk.Button(left_frame, width=10, text="Configure new trip",
+        self.configure_trip_button = ttk.Button(left_frame, width=10, text="Add trip",
                                                 name="conf_but", command=self.add_trip)
         self.configure_trip_button.grid(column=0, row=6)
 
@@ -117,12 +117,11 @@ class MainWindow:
                                              command=self.export_trip)
         self.export_trip_button.grid(column=2, row=6)
 
-        self.delete_trip_button = ttk.Button(left_frame, width=10, text="Delete", name = "del_but",
+        self.delete_trip_button = ttk.Button(left_frame, width=10, text="Delete", name="del_but",
                                              command=self.delete_trip)
         self.delete_trip_button.grid(column=3, row=6)
 
-        # TODO: new button and interface to see/modify monitored stops - add functionality
-        # TODO: results output (new window?) - select distinct stops with smallest stop_distance from position?
+        # TODO: results output in new window - select distinct stops with smallest stop_distance from position?
 
         self.interval_type_var = StringVar(value="duration")
         duration_radio = ttk.Radiobutton(left_frame, text="Duration", width=15,
@@ -256,7 +255,7 @@ class MainWindow:
         self.stops_object_list_list.clear()
         self.set_trip_id_list()
         for t_id in self.trip_id_list:
-            temp_t, temp_stops_list = get_monitor_config(self.session, t_id)
+            temp_t, temp_stops_list, start_stop, end_stop = get_monitor_config(self.session, t_id)
             self.trip_list.append(temp_t)
             self.stops_object_list_list.append(temp_stops_list)
 
@@ -489,8 +488,8 @@ class MainWindow:
         self.set_trip_id_list()
         if len(self.trip_id_list) == 1:
             self.set_widget_state("conf_mod_trip")
-            from interface_monitored_stops import MonitoredStopsWindow
-            mw = MonitoredStopsWindow(self.root, self.session, self)
+            from interface_monitored_stops import ModTripWindow
+            mw = ModTripWindow(self.root, self.session, self)
         else:
             messagebox.showerror("Modify trip", "Select a single trip for this operation!")
 

@@ -2,7 +2,7 @@
 Functions for interaction with the database
 """
 
-from sqlalchemy import select, and_, delete
+from sqlalchemy import select, and_, delete, update
 from sqlalchemy.orm import Session
 
 from datetime import timedelta, timezone
@@ -55,6 +55,12 @@ def update_stops(session: Session):
 
 
 def get_route_stops(session: Session, stop_id_list):
+    """
+    Retrieve stops from the db based on their Tranzy ID.
+    :param session: Session
+    :param stop_id_list: List of Tranzy stop IDs
+    :return: List of Stop objects
+    """
     stmt = select(Stop).where(Stop.stop_id.in_(stop_id_list))
     result = session.execute(stmt)
     return result.scalars().all()
@@ -97,7 +103,7 @@ def get_monitor_config(session: Session, trip_id) -> (Trip, list[Stop]):
                     start_stop <= StopOrder.stop_order,
                     StopOrder.stop_order <= end_stop))
     stops_object_list = [row[0] for row in session.execute(stmt).all()]
-    return row.Trip, stops_object_list
+    return row.Trip, stops_object_list, start_stop, end_stop
 
 
 def insert_position(session: Session, trip, vehicle, stops_object_list: list[Stop]) -> (str, int):
@@ -195,3 +201,10 @@ def delete_trip_data(session: Session, trip_id):
         session.commit()
     else:
         print("Something went wrong...")
+
+
+def update_monitored_stops(session: Session, trip: Trip, s_stop: int, e_stop: int):
+    upd_monitored_stops_stmt = update(MonitoredStops).where(MonitoredStops.trip_idx == trip.idx)\
+        .values(start_stop=s_stop, end_stop=e_stop)
+    session.execute(upd_monitored_stops_stmt)
+    session.commit()
