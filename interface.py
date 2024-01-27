@@ -25,11 +25,54 @@ class MainWindow:
         self.session = s
         self.trip_list = []  # to support multiple trips monitoring
         self.stops_object_list_list = []  # to support multiple trips monitoring
+        # dict to define widget's state based on execution state
+        self.widget_states = {
+            "idle_no_trip": {
+                "poll_int": NORMAL,
+                "conf_trips": NORMAL,
+                "conf_but": NORMAL,
+                "mod_but": DISABLED,
+                "export_but": DISABLED,
+                "del_but": DISABLED,
+                "start_but": DISABLED,
+                "stop_but": DISABLED
+            },
+            "idle_trip": {
+                "poll_int": NORMAL,
+                "conf_trips": NORMAL,
+                "conf_but": NORMAL,
+                "mod_but": NORMAL,
+                "export_but": NORMAL,
+                "del_but": NORMAL,
+                "start_but": NORMAL,
+                "stop_but": DISABLED
+            },
+            "monitoring": {
+                "poll_int": DISABLED,
+                "conf_trips": DISABLED,
+                "conf_but": DISABLED,
+                "mod_but": DISABLED,
+                "export_but": DISABLED,
+                "del_but": DISABLED,
+                "start_but": DISABLED,
+                "stop_but": NORMAL
+            },
+            "conf_mod_trip": {
+                "poll_int": DISABLED,
+                "conf_trips": DISABLED,
+                "conf_but": DISABLED,
+                "mod_but": DISABLED,
+                "export_but": DISABLED,
+                "del_but": DISABLED,
+                "start_but": DISABLED,
+                "stop_but": DISABLED
+            }
+        }
 
         self.root = r
         self.root.minsize(width=1024, height=768)
 
-        left_frame = ttk.Frame(self.root, width=462, height=768)
+        left_frame = ttk.Frame(self.root, width=462, height=768, name="left_frame")
         left_frame.configure(borderwidth=10, relief="raised")
         left_frame.grid_propagate(False)
         left_frame.grid(column=0, row=0)
@@ -50,7 +93,7 @@ class MainWindow:
         polling_label.grid(column=2, row=0)
 
         self.polling_interval_var = StringVar(value=str(POLLING_INTERVAL))
-        polling_interval_spin = ttk.Spinbox(left_frame, width=4, from_=10, to=90, increment=10,
+        polling_interval_spin = ttk.Spinbox(left_frame, width=4, from_=10, to=90, increment=10, name="poll_int",
                                             textvariable=self.polling_interval_var, wrap=True)
         polling_interval_spin.grid(column=3, row=0)
 
@@ -62,19 +105,20 @@ class MainWindow:
         # when selection changes update the monitored_trip_label var
         self.configured_trips.bind('<<ListboxSelect>>', self.update_selected_trip)
 
-        self.configure_trip_button = ttk.Button(left_frame, width=10, text="Configure new trip", command=self.add_trip)
+        self.configure_trip_button = ttk.Button(left_frame, width=10, text="Configure new trip",
+                                                name="conf_but", command=self.add_trip)
         self.configure_trip_button.grid(column=0, row=6)
 
-        self.modify_trip_button = ttk.Button(left_frame, width=10, text="Modify trip",
-                                             command=self.mod_trip, state=DISABLED)
+        self.modify_trip_button = ttk.Button(left_frame, width=10, text="Modify trip", name="mod_but",
+                                             command=self.mod_trip)
         self.modify_trip_button.grid(column=1, row=6)
 
-        self.export_trip_button = ttk.Button(left_frame, width=10, text="Export",
-                                             command=self.export_trip, state=DISABLED)
+        self.export_trip_button = ttk.Button(left_frame, width=10, text="Export", name="export_but",
+                                             command=self.export_trip)
         self.export_trip_button.grid(column=2, row=6)
 
-        self.delete_trip_button = ttk.Button(left_frame, width=10, text="Delete",
-                                             command=self.delete_trip, state=DISABLED)
+        self.delete_trip_button = ttk.Button(left_frame, width=10, text="Delete", name = "del_but",
+                                             command=self.delete_trip)
         self.delete_trip_button.grid(column=3, row=6)
 
         # TODO: new button and interface to see/modify monitored stops - add functionality
@@ -131,14 +175,12 @@ class MainWindow:
         self.end_hour_spin.grid(column=0, row=0)
         self.end_minute_spin.grid(column=1, row=0)
 
-        self.start_monitoring_button = ttk.Button(left_frame, width=30, text="Start monitoring",
+        self.start_monitoring_button = ttk.Button(left_frame, width=30, text="Start monitoring", name="start_but",
                                                   command=self.start_monitoring)
-        self.start_monitoring_button.configure(state=DISABLED)
         self.start_monitoring_button.grid(column=0, columnspan=4, row=10)
 
-        self.stop_monitoring_button = ttk.Button(left_frame, width=30, text="Stop monitoring",
+        self.stop_monitoring_button = ttk.Button(left_frame, width=30, text="Stop monitoring", name="stop_but",
                                                  command=self.stop_monitoring)
-        self.stop_monitoring_button.configure(state=DISABLED)
         self.stop_monitoring_button.grid(column=0, columnspan=4, row=11)
 
         for child in left_frame.winfo_children():
@@ -181,6 +223,7 @@ class MainWindow:
         self.agency_name_var.set(get_agency_name(AGENCY_ID))
         self.fill_configured_trips()
         self.configured_trips.focus()
+        self.set_widget_state("idle_no_trip")
 
     def update_selected_trip(self, event):
         """
@@ -193,10 +236,7 @@ class MainWindow:
             idx = int(idx_tuple[0])
             self.monitored_trip_var.set(value=self.trips_choices[idx])
             if not self.monitoring:
-                self.start_monitoring_button.configure(state=NORMAL)
-                self.modify_trip_button.configure(state=NORMAL)
-                self.export_trip_button.configure(state=NORMAL)
-                self.delete_trip_button.configure(state=NORMAL)
+                self.set_widget_state("idle_trip")
         elif len(idx_tuple) > 1:
             # multiple trips selected
             t = "Multiple: "
@@ -211,12 +251,7 @@ class MainWindow:
         Start monitoring when start_monitoring_button is pressed
         :return: None
         """
-        self.start_monitoring_button.configure(state=DISABLED)
-        self.stop_monitoring_button.configure(state=NORMAL)
-        self.configured_trips.configure(state=DISABLED)
-        self.configure_trip_button.configure(state=DISABLED)
-        self.export_trip_button.configure(state=DISABLED)
-        self.delete_trip_button.configure(state=DISABLED)
+        self.set_widget_state("monitoring")
         self.trip_list.clear()
         self.stops_object_list_list.clear()
         self.set_trip_id_list()
@@ -291,13 +326,7 @@ class MainWindow:
         if self.after_actual_start_id:
             self.root.after_cancel(self.after_actual_start_id)
             self.after_actual_start_id = None
-        self.start_monitoring_button.configure(state=NORMAL)
-        self.stop_monitoring_button.configure(state=DISABLED)
-        self.configured_trips.configure(state=NORMAL)
-        self.configure_trip_button.configure(state=NORMAL)
-        self.modify_trip_button.configure(state=NORMAL)
-        self.export_trip_button.configure(state=NORMAL)
-        self.delete_trip_button.configure(state=NORMAL)
+        self.set_widget_state("idle_trip")
         self.monitoring = False
         self.write_log("polling stopped")
         # enable corresponding widgets under radio buttons
@@ -388,11 +417,7 @@ class MainWindow:
         Open dedicated window to configure new trip in the db
         :return: None
         """
-        self.configure_trip_button.configure(state=DISABLED)
-        self.configured_trips.configure(state=DISABLED)
-        self.modify_trip_button.configure(state=DISABLED)
-        self.export_trip_button.configure(state=DISABLED)
-        self.delete_trip_button.configure(state=DISABLED)
+        self.set_widget_state("conf_mod_trip")
         from interface_add_trip import AddTripWindow
         tw = AddTripWindow(self.root, self.session, self)
 
@@ -454,22 +479,29 @@ class MainWindow:
         self.fill_configured_trips()
         self.configured_trips.selection_clear(0, self.configured_trips.index("end"))
         self.configured_trips.focus()
-        self.modify_trip_button.configure(state=DISABLED)
-        self.export_trip_button.configure(state=DISABLED)
-        self.delete_trip_button.configure(state=DISABLED)
+        self.set_widget_state("idle_no_trip")
         self.monitored_trip_var.set(value="Choose a trip to monitor")
 
     def mod_trip(self):
+        """
+        Open dedicated window to modify selected trip (monitored stops)
+        """
         self.set_trip_id_list()
         if len(self.trip_id_list) == 1:
-            self.configure_trip_button.configure(state=DISABLED)
-            self.configured_trips.configure(state=DISABLED)
-            self.modify_trip_button.configure(state=DISABLED)
-            self.export_trip_button.configure(state=DISABLED)
-            self.delete_trip_button.configure(state=DISABLED)
+            self.set_widget_state("conf_mod_trip")
             from interface_monitored_stops import MonitoredStopsWindow
             mw = MonitoredStopsWindow(self.root, self.session, self)
         else:
             messagebox.showerror("Modify trip", "Select a single trip for this operation!")
 
-# TODO: define execution states and map button states (which button should be active in an execution state)
+    def set_widget_state(self, exec_state):
+        """
+        Set widget states as defined in dict widget_states, based on current execution state.
+        :param exec_state: Execution state, key of dict widget_states
+        """
+        if exec_state in self.widget_states:
+            for key in self.widget_states[exec_state]:
+                # print(self.root.nametowidget("left_frame").nametowidget(key))
+                # print(key, self.widget_states[exec_state][key])
+                self.root.nametowidget("left_frame").nametowidget(key)\
+                    .configure(state=self.widget_states[exec_state][key])
