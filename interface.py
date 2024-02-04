@@ -19,10 +19,10 @@ class MainWindow:
         self.after_countdown_id = None  # id to cancel scheduling of countdown (single polling)
         self.after_stop_polling_id = None  # id to cancel scheduling of stop polling (time to run)
         self.after_actual_start_id = None  # id to cancel scheduling of deferred start
-        self.time_to_run = 5  # default time to run the polling (minutes)
+        self.time_to_run = TIME_TO_RUN  # default time to run the polling (minutes)
         self.monitoring = False  # monitoring in progress
         self.trip_id_list = []  # to support multiple trips monitoring
-        self.session = s
+        self.session = s  # SQLAlchemy session
         self.trip_list = []  # to support multiple trips monitoring
         self.stops_object_list_list = []  # to support multiple trips monitoring
         # dict to define widget's state based on execution state
@@ -35,7 +35,8 @@ class MainWindow:
                 "export_but": DISABLED,
                 "del_but": DISABLED,
                 "start_but": DISABLED,
-                "stop_but": DISABLED
+                "stop_but": DISABLED,
+                "show_stats": DISABLED
             },
             "idle_trip": {
                 "poll_int": NORMAL,
@@ -45,7 +46,8 @@ class MainWindow:
                 "export_but": NORMAL,
                 "del_but": NORMAL,
                 "start_but": NORMAL,
-                "stop_but": DISABLED
+                "stop_but": DISABLED,
+                "show_stats": NORMAL
             },
             "monitoring": {
                 "poll_int": DISABLED,
@@ -55,7 +57,8 @@ class MainWindow:
                 "export_but": DISABLED,
                 "del_but": DISABLED,
                 "start_but": DISABLED,
-                "stop_but": NORMAL
+                "stop_but": NORMAL,
+                "show_stats": DISABLED
             },
             "conf_mod_trip": {
                 "poll_int": DISABLED,
@@ -65,19 +68,20 @@ class MainWindow:
                 "export_but": DISABLED,
                 "del_but": DISABLED,
                 "start_but": DISABLED,
-                "stop_but": DISABLED
+                "stop_but": DISABLED,
+                "show_stats": DISABLED
             }
         }
 
         self.root = r
-        self.root.minsize(width=1024, height=768)
+        self.root.minsize(width=1024, height=600)
 
-        left_frame = ttk.Frame(self.root, width=462, height=768, name="left_frame")
+        left_frame = ttk.Frame(self.root, width=462, height=600, name="left_frame")
         left_frame.configure(borderwidth=10, relief="raised")
         left_frame.grid_propagate(False)
         left_frame.grid(column=0, row=0)
 
-        right_frame = ttk.Frame(self.root, width=562, height=768)
+        right_frame = ttk.Frame(self.root, width=562, height=600, name="right_frame")
         right_frame.configure(borderwidth=10, relief="raised")
         right_frame.grid_propagate(False)
         right_frame.grid(column=1, row=0)
@@ -120,8 +124,6 @@ class MainWindow:
         self.delete_trip_button = ttk.Button(left_frame, width=10, text="Delete", name="del_but",
                                              command=self.delete_trip)
         self.delete_trip_button.grid(column=3, row=6)
-
-        # TODO: results output in new window - select distinct stops with smallest stop_distance from position?
 
         self.interval_type_var = StringVar(value="duration")
         duration_radio = ttk.Radiobutton(left_frame, text="Duration", width=15,
@@ -178,9 +180,14 @@ class MainWindow:
                                                   command=self.start_monitoring)
         self.start_monitoring_button.grid(column=0, columnspan=4, row=10)
 
+        self.raw_log_var = BooleanVar(value=False)
+        self.raw_log_check = ttk.Checkbutton(left_frame, text="Raw logging vehicles JSON (big size)",
+                                        variable=self.raw_log_var, onvalue=True, offvalue=False)
+        self.raw_log_check.grid(column=0, columnspan=4, row=11)
+
         self.stop_monitoring_button = ttk.Button(left_frame, width=30, text="Stop monitoring", name="stop_but",
                                                  command=self.stop_monitoring)
-        self.stop_monitoring_button.grid(column=0, columnspan=4, row=11)
+        self.stop_monitoring_button.grid(column=0, columnspan=4, row=12)
 
         for child in left_frame.winfo_children():
             child.grid_configure(padx=5, pady=10)
@@ -208,12 +215,22 @@ class MainWindow:
         self.log_scroll_x.grid(column=0, row=1, sticky="WE")
         self.monitor_log.configure(xscrollcommand=self.log_scroll_x.set)
 
-        next_poll_label = ttk.Label(right_frame, text="Next poll in (s):", width=30)
+        next_poll_label = ttk.Label(right_frame, text="Next poll in (seconds):", width=30)
         next_poll_label.grid(column=0, row=2)
 
         self.timer_var = StringVar(value="--")
         self.timer_label = ttk.Label(right_frame, textvariable=self.timer_var, width=10)
         self.timer_label.grid(column=1, row=2)
+
+        remaining_time_label = ttk.Label(right_frame, text="Remaining time (minutes):", width=30)
+        remaining_time_label.grid(column=0, row=3)
+
+        self.remaining_var = StringVar(value="--")
+        remaining_timer_label = ttk.Label(right_frame, textvariable=self.remaining_var, width=10)
+        remaining_timer_label.grid(column=1, row=3)
+
+        self.show_stats_w_button = ttk.Button(right_frame, text="Show stats", name="show_stats", width=30, command=self.show_stats)
+        self.show_stats_w_button.grid(column=0, columnspan=2, row=4)
 
         for child in right_frame.winfo_children():
             child.grid_configure(padx=5, pady=10)
@@ -251,6 +268,7 @@ class MainWindow:
         :return: None
         """
         self.set_widget_state("monitoring")
+        self.raw_log_check.configure(state=DISABLED)
         self.trip_list.clear()
         self.stops_object_list_list.clear()
         self.set_trip_id_list()
@@ -301,18 +319,19 @@ class MainWindow:
         self.after_actual_start_id = None
         self.write_log(f"polling vehicles for trip {', '.join(self.trip_id_list)} for {self.time_to_run} minutes")
         self.monitoring = True
-        # call stop_monitoring after time_to_run elapses
-        self.after_stop_polling_id = self.root.after(self.time_to_run * 60 * 1000, self.stop_monitoring)
+        # call countdown_total which will call stop_monitoring after time_to_run
+        self.countdown_total(self.time_to_run)
         # first call to countdown which will call itself every second for polling_interval_var
         # when timer reaches 0 it polls vehicles
         self.countdown(0)
 
     def stop_monitoring(self):
         """
-        Stop monitoring anc cancel all pending scheduled calls
+        Stop monitoring and cancel all pending scheduled calls
         :return: None
         """
         self.timer_var.set("--")
+        self.remaining_var.set(value="--")
         # cancel polling if in progress
         if self.after_countdown_id:
             self.root.after_cancel(self.after_countdown_id)
@@ -326,6 +345,7 @@ class MainWindow:
             self.root.after_cancel(self.after_actual_start_id)
             self.after_actual_start_id = None
         self.set_widget_state("idle_trip")
+        self.raw_log_check.configure(state=NORMAL)
         self.monitoring = False
         self.write_log("polling stopped")
         # enable corresponding widgets under radio buttons
@@ -346,7 +366,7 @@ class MainWindow:
             self.timer_var.set("--")
             self.timer_label.update()
             if self.monitoring:
-                vehicles = get_vehicles(self.trip_id_list)
+                vehicles = get_vehicles(self.trip_id_list, self.raw_log_var.get())
                 if not vehicles or len(vehicles) == 0:
                     self.write_log("no vehicles on route", 2)
                 else:
@@ -359,6 +379,19 @@ class MainWindow:
                         self.write_log(msg, msg_type)
                 self.countdown(int(self.polling_interval_var.get()))
 
+    def countdown_total(self, total_timer: int):
+        """
+        Countdown for total timer. Stop monitoring when reaches zero.
+        :param total_timer: Remaining countdown in minutes
+        :return: None
+        """
+        self.remaining_var.set(value=str(total_timer))
+        if total_timer > 0:
+            self.after_stop_polling_id = self.root.after(60000, self.countdown_total, total_timer - 1)
+        else:
+            self.remaining_var.set(value="--")
+            self.stop_monitoring()
+
     def write_log(self, message, msg_type=0):
         """
         Writes a message at the end of monitor_log widgets, and scrolls to the end
@@ -367,11 +400,11 @@ class MainWindow:
         :return: None
         """
         tags = ["information", "logged_position", "skipped_position"]
-        self.monitor_log["state"] = "normal"
+        self.monitor_log.configure(state=NORMAL)
         self.monitor_log.insert(END, f"{datetime.now().astimezone().strftime('%H:%M:%S')} - {message}\n",
                                 (tags[msg_type]))
         self.monitor_log.see(END)
-        self.monitor_log["state"] = DISABLED
+        self.monitor_log.configure(state=DISABLED)
 
     def select_interval_type(self):
         """
@@ -438,7 +471,7 @@ class MainWindow:
     def delete_trip(self):
         """
         Delete all data for selected trip
-        :return:
+        :return: None
         """
         self.set_trip_id_list()
         if len(self.trip_id_list) == 1:
@@ -500,7 +533,21 @@ class MainWindow:
         """
         if exec_state in self.widget_states:
             for key in self.widget_states[exec_state]:
-                # print(self.root.nametowidget("left_frame").nametowidget(key))
-                # print(key, self.widget_states[exec_state][key])
-                self.root.nametowidget("left_frame").nametowidget(key)\
-                    .configure(state=self.widget_states[exec_state][key])
+                if key != "show_stats":
+                    self.root.nametowidget("left_frame").nametowidget(key)\
+                        .configure(state=self.widget_states[exec_state][key])
+                else:
+                    self.root.nametowidget("right_frame").nametowidget(key) \
+                        .configure(state=self.widget_states[exec_state][key])
+
+    def show_stats(self):
+        """
+        Open dedicated window to show statistics for selected trip
+        """
+        self.set_trip_id_list()
+        if len(self.trip_id_list) == 1:
+            self.set_widget_state("conf_mod_trip")
+            from interface_show_stats import ShowStatsWindow
+            sw = ShowStatsWindow(self.root, self.session, self)
+        else:
+            messagebox.showerror("Show stats", "Select a single trip for this operation!")

@@ -28,7 +28,7 @@ class AddTripWindow:
 
         self.add_trip_window = Toplevel(self.root)
         self.add_trip_window.title("Add trip")
-        add_trip_frame = ttk.Frame(self.add_trip_window, width=500, height=400)
+        add_trip_frame = ttk.Frame(self.add_trip_window, width=500, height=430)
         add_trip_frame.grid_propagate(False)
         add_trip_frame.grid(column=0, row=0)
 

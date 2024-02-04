@@ -25,7 +25,7 @@ class ModTripWindow:
 
         self.mon_stops_window = Toplevel(self.root)
         self.mon_stops_window.title("Monitored stops")
-        mon_stops_frame = ttk.Frame(self.mon_stops_window, width=460, height=400)
+        mon_stops_frame = ttk.Frame(self.mon_stops_window, width=460, height=350)
         mon_stops_frame.grid_propagate(False)
         mon_stops_frame.grid(column=0, row=0)
 

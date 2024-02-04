@@ -2,7 +2,7 @@
 Functions for interaction with the database
 """
 
-from sqlalchemy import select, and_, delete, update
+from sqlalchemy import select, and_, delete, update, func, extract
 from sqlalchemy.orm import Session
 
 from datetime import timedelta, timezone
@@ -85,7 +85,7 @@ def get_monitor_config(session: Session, trip_id) -> (Trip, list[Stop]):
     Get the necessary details for monitoring
     :param session: The open Session to the db
     :param trip_id: The ID of the monitored trip.
-    :return: Trip object and list of Stop object
+    :return: Trip object, list of Stop object, monitored start and end
     """
     # retrieve trip record from db
     stmt = select(Trip, MonitoredStops.start_stop, MonitoredStops.end_stop) \
@@ -204,7 +204,47 @@ def delete_trip_data(session: Session, trip_id):
 
 
 def update_monitored_stops(session: Session, trip: Trip, s_stop: int, e_stop: int):
+    """
+    Re-configure a saved trip by updating the start and end stop
+    :param session: Session
+    :param trip: Trip object to re-configure
+    :param s_stop: Start stop order
+    :param e_stop: End stop order
+    :return: None
+    """
     upd_monitored_stops_stmt = update(MonitoredStops).where(MonitoredStops.trip_idx == trip.idx)\
         .values(start_stop=s_stop, end_stop=e_stop)
     session.execute(upd_monitored_stops_stmt)
     session.commit()
+
+
+def get_trip_stats(session: Session, trip_idx, start_stop_idx, end_stop_idx):
+    """
+    Retrieve two list of Positions closest to the stops.
+    :param session: Session
+    :param trip_idx: DB trip idx
+    :param start_stop_idx: DB stop idx of the stop from where to display stats
+    :param end_stop_idx: DB stop idx of the stop to where to display stats
+    :return: List of positions for each given stop
+    """
+    stmt = select(Position, func.min(Position.stop_distance))\
+        .where(and_(Position.trip_idx == trip_idx, Position.stop_idx == start_stop_idx))\
+        .group_by(extract('year', Position.timestamp),
+                  extract('month', Position.timestamp),
+                  extract('day', Position.timestamp),
+                  extract('hour', Position.timestamp),
+                  Position.vehicle_no,
+                  Position.stop_idx)\
+        .order_by(Position.timestamp)
+    positions_start = session.execute(stmt).scalars()
+    stmt = select(Position, func.min(Position.stop_distance))\
+        .where(and_(Position.trip_idx == trip_idx, Position.stop_idx == end_stop_idx))\
+        .group_by(extract('year', Position.timestamp),
+                  extract('month', Position.timestamp),
+                  extract('day', Position.timestamp),
+                  extract('hour', Position.timestamp),
+                  Position.vehicle_no,
+                  Position.stop_idx)\
+        .order_by(Position.timestamp)
+    positions_end = session.execute(stmt).scalars()
+    return positions_start.all(), positions_end.all()

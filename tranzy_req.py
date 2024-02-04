@@ -9,6 +9,7 @@ https://tranzy.dev/accounts/my-apps
 
 from datetime import datetime
 import requests
+import json
 
 from config import AGENCY_ID, TRANZY_KEY, TRANZY_URL, \
     AGENCY, VEHICLES, ROUTES, TRIPS, STOPS, STOP_TIMES
@@ -33,17 +34,19 @@ def explain_error(s: str) -> str:
 
 
 def get_agency_name(agency_id: str):
+    """
+    Get agency name
+    :param agency_id: Tranzy agency ID
+    :return: Agency name
+    """
     headers_ag = {k: headers[k] for k in headers if k != "X-Agency-Id"}
     try:
         response = requests.get(url=f"{TRANZY_URL}{AGENCY}", headers=headers_ag)
         response.raise_for_status()
     except requests.exceptions.HTTPError as err:
         print(explain_error(str(err)))
-        # raise SystemExit(err)
         return "Agency name error"
     else:
-        # print(headers_ag)
-        # print(response.json())
         return next((a['agency_name'] for a in response.json() if a["agency_id"] == int(agency_id)), None)
 
 
@@ -80,9 +83,10 @@ def get_trips(route_id: int):
         return [t for t in response.json() if t["route_id"] == route_id]
 
 
-def get_vehicles(trip_id: list[str]):
+def get_vehicles(trip_id: list[str], raw_log: bool):
     """
     Get vehicles positions.
+    :param raw_log: Enable raw logging of JSON data
     :param trip_id: Trip ID obtain from get_trips return, used to filter output
     :return: List of json data for the positions of vehicles linked to the respective trip
     """
@@ -99,6 +103,9 @@ def get_vehicles(trip_id: list[str]):
         return []
     else:
         data = response.json()
+        if raw_log:
+            with open(f"vehicles_{datetime.now().astimezone().strftime('%Y%m%d')}.json", "a", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=4)
         if type(data) == list and len(data) != 0 and type(data[0]) == dict and "trip_id" in data[0]:
             return [v for v in response.json() if v["trip_id"] in trip_id]
         else:
